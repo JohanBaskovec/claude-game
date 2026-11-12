@@ -36,6 +36,23 @@ typedef enum EnemyType {
     ENEMY_TYPE_COUNT
 } EnemyType;
 
+/* Bruitages (GDD §20), joués par audio_play. */
+typedef enum Sound {
+    SOUND_PICKUP_BOMB,   /* métronome ramassé : tic-tac */
+    SOUND_PICKUP_COIN,   /* royalties ramassées : tintement de pièces */
+    SOUND_SPLAT,         /* un ennemi meurt */
+    SOUND_TICK,          /* métronome posé : battement « tic »... */
+    SOUND_TOCK,          /* ... et « tac » */
+    SOUND_EXPLOSION,     /* le métronome explose */
+    SOUND_INK_SPIT,      /* la plume crache de l'encre */
+    SOUND_MONK_NOTE,     /* le moine chante une note grave */
+    SOUND_BELL,          /* le sonneur sonne sa cloche */
+    SOUND_DIG,           /* le ver creuse avant de sortir */
+    SOUND_BABY_CRY,      /* un bébé pleure : « ouiiinnn » */
+    SOUND_BABY_SOB,      /* ... ou sanglote : « oua... ouaaaah » */
+    SOUND_COUNT
+} Sound;
+
 /* Armes (GDD §4 et §14). */
 typedef enum WeaponId {
     WEAPON_VOICE,
@@ -261,6 +278,15 @@ typedef struct Tuning {
 
     /* Sons (GDD §19) */
     float sound_volume;               /* volume général, 0..1 */
+    float chant_pause;                /* s sans tirer avant de changer de chant */
+    float chant_volume;               /* chant d'Amadeus (tirs), 0..1 */
+    float sfx_volume;                 /* tous les bruitages, 0..1 */
+    float sound_gain[SOUND_COUNT];    /* volume de chaque bruitage, 0..1 (peut dépasser 1) */
+    float splat_boss_pitch;           /* mort du boss : même son, plus grave et plus long */
+    float baby_cry_min;               /* un bébé pleure toutes les baby_cry_min à baby_cry_max s */
+    float baby_cry_max;
+    float baby_cry_gap;               /* s au moins entre deux pleurs dans la salle, quel que soit le nombre de bébés */
+    float boss_cry_pitch;             /* le Gros Bébé pleure plus grave */
 
     /* Barre de vie (soufflet de crescendo) */
     float hud_bar_base_len;    /* longueur du soufflet, px ... */

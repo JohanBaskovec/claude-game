@@ -24,7 +24,9 @@ Bomb *bomb_spawn(BombPool *pool, float x, float y)
 
 bool bomb_update(Bomb *b, float dt)
 {
+    b->tick = 0;
     if (!b->active) return false;
+    if (b->timer == 0.0f && !b->exploded) b->tick = 1;   /* posé : premier battement */
     b->timer += dt;
     if (b->exploded) {
         if (b->timer >= EXPLOSION_TIME) b->active = false;
@@ -33,7 +35,10 @@ bool bomb_update(Bomb *b, float dt)
     /* Le balancier accélère : de 2 à 10 battements par seconde. */
     float fuse = SDL_max(tuning.bomb_fuse, 0.01f);
     float u = SDL_min(b->timer / fuse, 1.0f);
+    int beat = (int)(b->phase / SDL_PI_F);
     b->phase += (2.0f + 8.0f * u * u) * SDL_PI_F * dt;
+    int now = (int)(b->phase / SDL_PI_F);
+    if (now > beat) b->tick = (now % 2) ? 2 : 1;   /* le balancier passe au milieu : tic, tac, tic... */
     if (b->timer >= fuse - 1e-4f) {
         b->exploded = true;
         b->timer = 0.0f;

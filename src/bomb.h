@@ -14,6 +14,7 @@ typedef struct Bomb {
     float x, y;       /* au sol ; un métronome posé ne bouge pas */
     float timer;      /* s depuis la pose, puis depuis l'explosion */
     float phase;      /* phase du balancier, rad */
+    int   tick;       /* battement pendant ce pas : 0 aucun, 1 « tic », 2 « tac » (lu par game.c) */
 } Bomb;
 
 typedef struct BombPool {

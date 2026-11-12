@@ -50,6 +50,9 @@ typedef struct Enemy {
     int       burst_left;     /* moine : notes restantes de la rafale */
     float     sing_timer;     /* > 0 : bouche ouverte (moine), cloche qui sonne (sonneur) */
     bool      fire;           /* vrai pendant le pas où il tire, lu par game.c */
+    bool      dig;            /* ver : vrai pendant le pas où il commence à creuser vers la surface */
+    float     cry_timer;      /* bébés : s avant de pleurer */
+    bool      cry;            /* bébés : vrai pendant le pas où il se met à pleurer, lu par game.c */
 
     /* Boss */
     float     state_time;     /* s depuis le début de l'état */

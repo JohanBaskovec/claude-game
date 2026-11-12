@@ -3,7 +3,7 @@
 > Document de travail destiné à Claude Code. Il décrit l'univers et les choix de design.
 > **Statut : en cours de conception.** Les sections marquées ✅ sont décidées, 💡 sont des idées à valider, ❓ sont des questions ouvertes.
 > **Source de vérité du design : ce fichier, dans le dépôt** (`docs/concept/GDD.md`). La conception se fait désormais uniquement avec Claude Code, qui le met à jour au fil des décisions prises avec Johan.
-> **Phase en cours : Phase 10 (section 19).** Les Phases 1 à 9 (sections 10 à 18) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
+> **Phase en cours : Phase 11 (section 20).** Les Phases 1 à 10 (sections 10 à 19) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
 
 ---
 
@@ -239,7 +239,7 @@ On découpe par **époques** plutôt que par siècles, car entre le IXe et le XI
   - sol : rectangle de 96 à 864 en x et de 108 à 468 en y, soit **768×360 px** (une « cellule » de la page, voir plus bas) ;
   - profondeur des murs : haut 108 px, côtés 96 px, bas 70 px ;
   - murs : briques de château en perspective, avec biseaux, éclats et assombrissement vers le haut du mur ;
-  - sol : grandes dalles de pierre peu contrastées ;
+  - sol : ~~grandes dalles de pierre peu contrastées~~ → ✅ **du parchemin** (voir « Sol en parchemin » plus bas) ;
   - portes en bois (planches, veinure, ferrures rivetées, heurtoir), sous un arc de claveaux de pierre.
 - ✅ **Sol du premier étage : un manuscrit de chant à neumes**, pas de lignes :
   - comme dans les manuscrits de Saint-Gall (IXe–Xe s.), du **texte latin** avec des **neumes** posés au-dessus des syllabes, sans portée ;
@@ -295,6 +295,29 @@ On découpe par **époques** plutôt que par siècles, car entre le IXe et le XI
   - `compose_page.py` : rendus de démonstration (salle de la page gauche, salle de la reliure, haut de la double page en 3×2, vue d'ensemble 7×10) ;
   - `amadeus_hd.py` : le sprite d'Amadeus.
   - En jeu, le plus simple est de **pré-rendre le sol de chaque cellule** dans une texture 768×360 (ou toute la page une fois par étage), plutôt que de dessiner le texte à chaque frame.
+
+### ✅ Sol en parchemin (remplace les dalles de pierre)
+- ✅ **Le sol n'est plus de la pierre mais le parchemin de la page** : c'est la page du livre de chœur qu'on foule, ce qui va avec « le niveau est une partition ».
+- 💡 Rendu proposé : peau crème un peu jaunie, grain fin et points des follicules, teinte irrégulière (plus sombre vers les bords de la page et dans le creux de la reliure) ; la **réglure** à la pointe sèche (lignes très fines qui guident l'écriture) et les **piqûres** dans la marge, comme sur les vrais manuscrits.
+- ❓ **Les murs** : à décider. Proposition de Claude : garder une **architecture**, mais **peinte sur la page** à la manière des *tables des canons* carolingiennes (colonnes et arcs dessinés à l'encre, aplats rouge, bleu et or), plutôt que des pierres réalistes. Les portes deviennent les arcs. Autre possibilité : la bordure enluminée de la page (entrelacs, rinceaux). Garder les briques actuelles reste possible, mais elles jurent un peu avec un sol en papier.
+
+### ❓ Rendre les salles plus vivantes
+- ✅ **Des trous dans le parchemin**, qui ressemblent à des trous dans du papier (bord déchiré, fibres, ombre ; on voit le noir ou la page du dessous). Fait réel : les parchemins ont souvent des trous, défauts de la peau, et les copistes écrivaient autour ; certains étaient recousus, voire brodés de soie.
+  - 💡 Comme les trous de TBOI : on ne peut pas marcher dessus, les notes passent au-dessus. Le texte du sol contourne les trous.
+  - 💡 Variantes : **trou recousu** (on peut passer sur la couture), **brûlure de chandelle** (bord noirci), **galerie du ver de livre** (le ver laisse un trou là où il sort).
+- 💡 **Obstacles** proposés (équivalents des rochers, pots, feux, TNT et pointes de TBOI), tous tirés du scriptorium :
+  - **sceaux de cire rouge** : les « rochers », indestructibles sauf au métronome ;
+  - **encriers** : cassables par les tirs, ils répandent une flaque d'encre (qui ralentit) ; parfois des royalties dedans ;
+  - **chandelles** : les « feux », elles brûlent au contact ; un tir les éteint ; la cire fondue fait une flaque glissante ;
+  - **lettrines qui se dressent** : les grandes initiales rouges du texte sortent du sol et forment des blocs ; on peut les briser en éclats d'encre ;
+  - **aiguilles du relieur** qui sortent du sol par intermittence : les « pointes » ;
+  - **piles de livres**, **pierre ponce** et **grattoir** du copiste, **signet** (ruban qui traverse la salle comme un muret bas) ;
+  - les **fils de la reliure** dans la colonne centrale (déjà en idée).
+- 💡 **Autres idées** :
+  - **plans de salles faits à la main**, comme TBOI (des dizaines de dispositions d'obstacles et d'ennemis), plutôt que des obstacles posés au hasard : c'est ce qui rend les salles de TBOI intéressantes ;
+  - **petites choses sur la page**, sans effet : fleur séchée pressée entre les pages, mouche écrasée, cheveu, tache de vin, empreinte de doigt, neumes raturés, *marginalia* dessinées dans les marges (lapin, escargot chevalier) ;
+  - **salles secrètes** derrière un mur qu'on fait sauter au métronome ;
+  - **salles sombres** éclairées par les chandelles.
 
 ### ✅ Police du sol
 - **Junicode**, version 2.211, de Peter S. Baker. Police libre sous licence **SIL Open Font License 1.1** : utilisable et redistribuable dans un jeu commercial, à condition de joindre la licence.
@@ -690,22 +713,58 @@ Les autres ennemis du §8 (blemmyes, cynocéphales, sciapodes, chapiteaux…), l
 ### Hors périmètre (ne pas faire)
 Les taches qui restent quand on revient dans une salle, les morceaux d'ennemis (os, auréoles, plumes), les sons.
 
-## 19. PHASE 10 — Sons : le chant d'Amadeus
+## 19. PHASE 10 — Sons : le chant d'Amadeus ✅ (terminée)
 
 **But** : les premiers sons, en commençant par le tir. Tout est synthétisé par le jeu (aucun fichier audio), comme le décor.
 
 ### Son du tir : Amadeus chante *Ut queant laxis* ✅
-- À chaque tir, Amadeus **chante la syllabe suivante de l'hymne *Ut queant laxis*** (Paul Diacre, VIIIe s., Liber Usualis 1961 p. 1504, domaine public), celui dont Guido d'Arezzo a tiré les noms des notes ut, ré, mi, fa, sol, la. Son texte est déjà écrit sur le sol.
+- À chaque tir, Amadeus **chante la syllabe suivante d'un chant grégorien**. Au début de la partie, c'est l'hymne ***Ut queant laxis*** (Paul Diacre, VIIIe s.), celui dont Guido d'Arezzo a tiré les noms des notes ut, ré, mi, fa, sol, la. Son texte est déjà écrit sur le sol.
 - Chaque syllabe a ses vraies notes : une seule note, ou un petit groupe (neume) chanté d'un trait. Il chante la **vraie voyelle** de la syllabe (« Ut » sur u, « la » sur a…).
-- La mélodie continue d'un tir à l'autre et recommence au début quand la strophe est finie (38 syllabes).
-- Voix d'enfant (une octave au-dessus de la notation), un peu synthétique : ça va avec le pixel art.
+- La mélodie continue d'un tir à l'autre.
+- Voix d'enfant, un peu synthétique : ça va avec le pixel art. Chaque chant est transposé pour que le milieu de sa tessiture tombe vers fa5.
 - Toutes les armes chantent pour l'instant ; les sons propres aux instruments viendront plus tard.
 
+### Plusieurs chants ✅
+- Pour que ce ne soit pas répétitif, Amadeus connaît **six chants** (Liber Usualis 1961, domaine public, relevés sur GregoBase) :
+  - *Ut queant laxis* (hymne de saint Jean-Baptiste, p. 1504) ;
+  - *Veni Creator Spiritus* (p. 885) ;
+  - *Ave maris stella* (p. 1259) ;
+  - *Pange lingua* (p. 957) ;
+  - *Dies irae* (séquence des défunts, 2 strophes, p. 1810) ;
+  - *Victimae paschali laudes* (séquence de Pâques, p. 780).
+- **Il change de chant quand on arrête de tirer plus de 2 secondes** (`tuning.chant_pause`), et aussi quand le chant est fini. Le nouveau chant est tiré au hasard parmi les autres, et commence à sa première syllabe.
+- Les mélodies sont dans `src/chant_data.h`, généré depuis les fichiers GABC de GregoBase.
+
 ### Technique ✅
-- Module `audio.c` : un flux SDL (`SDL_OpenAudioDeviceStream`), rempli à chaque image depuis la boucle principale (pas de thread à nous). Quelques voix mixées, sons calculés une fois au démarrage.
+- Module `audio.c` : un flux SDL (`SDL_OpenAudioDeviceStream`), rempli à chaque image depuis la boucle principale (pas de thread à nous). Douze voix mixées (chant et bruitages) ; chaque syllabe est calculée au moment du tir dans le tampon de sa voix (quelques millisecondes).
 - Synthèse vocale par formants : harmoniques de la note, dont le volume suit les résonances de la voyelle ; vibrato léger ; petit souffle sur les consonnes (s, t, x…).
 - Sans carte son (ou si l'audio ne s'ouvre pas), le jeu tourne en silence.
 - Volume réglable dans `tuning`.
 
 ### Hors périmètre (ne pas faire)
 Les autres sons (dégâts, morts, métronome, ennemis, interface), les sons des instruments, la musique, le réglage du volume dans un menu.
+
+## 20. PHASE 11 — Bruitages : ramassage, morts, métronome, ennemis
+
+**But** : les premiers bruitages, en plus du chant. Toujours synthétisés par le jeu, sans fichier audio.
+
+### Sons ✅
+- **Métronome ramassé** : un **tic-tac** de métronome mécanique (deux chocs de bois, le second plus grave).
+- **Royalties ramassées** : **deux pièces qui tintent**, la seconde une quarte plus haut (« ka-ching »). Son de métal (modes de vibration d'un disque), pas une note de synthé.
+- **Un ennemi meurt** : un « splotch » mouillé qui va avec l'explosion (§18) : choc grave, éclaboussure qui s'assourdit, petites bulles. Le même pour tous les ennemis ; celui du **boss** est plus grave et plus long.
+- **Métronome posé** : un **tic-tac** à chaque battement du balancier (tic, tac, tic…), qui accélère avec lui (de 2 à 10 battements par seconde), puis l'**explosion** : craquement, grondement grave, et les morceaux de bois du métronome qui retombent.
+- **Plume géante** : un **crachat d'encre** quand elle tire (« pfut », jet mouillé qui descend, petit « bloup »).
+- **Moine chanteur** : à chaque note tirée, il **chante une note grave de chant grégorien**, toujours la même (ré3, voix d'homme sur « o ») avec une légère variation.
+- **Sonneur de cloche** : un **coup de cloche** d'église (bourdon, tierce mineure, quinte…) qui résonne plus d'une seconde, à chaque salve.
+- **Ver de livre** : un bruit de **ver qui creuse** pendant que le sol se soulève avant sa sortie : grondement sourd et grattements de plus en plus serrés.
+- **Bébés** : ils **pleurent de temps en temps, pas en continu**. Deux pleurs : un long « ouiiin » ou un sanglot « oua… ouaaah » avec une inspiration entre les deux. Voix aiguë, tendue et un peu éraillée, qui monte puis retombe. Chaque bébé pleure toutes les 4 à 10 s, au hasard (`baby_cry_min`, `baby_cry_max`). Jamais deux pleurs à moins de 3 s d'écart dans la salle, quel que soit le nombre de bébés (`baby_cry_gap`). Le **Gros Bébé** pleure aussi, plus grave et plus lentement (`boss_cry_pitch`).
+- Chaque son varie un peu de hauteur à chaque fois (± 6 %), pour ne pas sonner mécanique.
+- Le même son lancé plusieurs fois au même instant (trois ennemis tués par un métronome, deux moines qui tirent ensemble) n'est joué qu'une fois : pas de son trois fois plus fort.
+- Un prix encore en vol quand on change de salle est donné sans bruit.
+
+### Technique ✅
+- Dans `audio.c` : chaque bruitage est calculé une fois à l'ouverture (résonances amorties, bruit filtré), puis rejoué dans une voix libre avec `audio_play(son, hauteur)`. Seize voix ; une voix lit le son à la hauteur voulue sans le recopier. Les battements du métronome (`Bomb.tick`) et le début du creusement du ver (`Enemy.dig`) sont signalés à `game.c` comme les tirs (`fire`).
+- Réglages dans `tuning` : volume général (`sound_volume`), du chant (`chant_volume`), de tous les bruitages (`sfx_volume`) et **de chaque bruitage** (`sound_gain[son]`), plus `splat_boss_pitch`. Les sons sont calculés à plein volume ; le volume est appliqué à la lecture.
+
+### Hors périmètre (ne pas faire)
+Les autres sons (dégâts reçus, mort d'Amadeus, atterrissage du boss, briques, encre qui tombe au sol, ver qui replonge, portes, objets, interface), les sons des instruments, la musique, le réglage du volume dans un menu.

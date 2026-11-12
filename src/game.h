@@ -51,6 +51,7 @@ typedef struct Game {
     bool           socle_armed;           /* idem pour le socle d'arme (sinon on échangerait en boucle) */
     float          shake_timer;           /* tremblement de l'écran, s */
     float          time;                  /* s de jeu, pour les animations */
+    float          cry_cooldown;          /* s avant qu'un bébé puisse de nouveau pleurer (tuning.baby_cry_gap) */
 
     /* Affichage de la mini-carte, réglé par la fenêtre (souris, menu de debug). */
     bool           reveal_map; /* toute la carte visible et téléportation partout (debug) */

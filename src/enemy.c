@@ -53,6 +53,7 @@ Enemy *enemy_spawn(EnemyPool *pool, EnemyType type, float x, float y)
         e->anim_time = SDL_randf() * 10.0f;   /* pour qu'ils ne se dandinent pas en rythme */
         e->target_x = x;
         e->target_y = y;
+        e->cry_timer = rand_range(tuning.baby_cry_min * 0.5f, tuning.baby_cry_max);   /* pas tous à l'entrée de la salle */
         switch (type) {
         case ENEMY_BOSS:
             e->state = BOSS_WANDER;
@@ -332,6 +333,7 @@ static void worm_set_state(Enemy *e, WormState s, float dur)
     e->state = s;
     e->state_time = 0.0f;
     e->state_dur = dur;
+    if (s == WORM_WARN) e->dig = true;
 }
 
 /* Ver de livre : caché, il choisit l'endroit où est le joueur ; le sol s'y soulève, puis il jaillit. */
@@ -399,6 +401,12 @@ void enemy_update_all(EnemyPool *pool, const Room *room, float target_x, float t
         if (e->slow_timer > 0.0f) e->slow_timer -= dt;
         if (e->sing_timer > 0.0f) e->sing_timer -= dt;
         e->fire = false;
+        e->dig = false;
+        e->cry = false;
+        if ((e->type == ENEMY_BABY || e->type == ENEMY_BOSS) && (e->cry_timer -= dt) <= 0.0f) {
+            e->cry = true;
+            e->cry_timer = rand_range(tuning.baby_cry_min, tuning.baby_cry_max);
+        }
 
         switch (e->type) {
         case ENEMY_BOSS:   boss_update(e, room, dt); break;

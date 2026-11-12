@@ -60,6 +60,7 @@ static void enemy_died(Game *g, const Enemy *e)
     bool boss = e->type == ENEMY_BOSS;
     float x = e->box.x + e->box.w * 0.5f, y = e->box.y + e->box.h * 0.5f;
     splatter_burst(&g->splatter, x, y, boss ? 60.0f : 24.0f, boss ? tuning.splat_boss_scale : 1.0f, color);
+    audio_play(SOUND_SPLAT, boss ? tuning.splat_boss_pitch : 1.0f);
 }
 
 void game_kill_enemies(Game *g)
@@ -266,7 +267,7 @@ static void fire(Game *g, PlayerFire f)
         return;
     }
 
-    audio_sing();   /* Amadeus chante la syllabe suivante d'Ut queant laxis */
+    audio_sing(g->time);   /* Amadeus chante la syllabe suivante du chant en cours */
     float dx = f.dx, dy = f.dy, cx, cy;
     player_center(p, &cx, &cy);
     ShotSpec s = weapon_shot(&p->stats, g->owned, f.charge);
@@ -362,10 +363,12 @@ static void enemy_fire(Game *g, const Enemy *e, float px, float py)
     float ux = len > 0.0f ? dx / len : 0.0f, uy = len > 0.0f ? dy / len : 1.0f;
     switch (e->type) {
     case ENEMY_MONK:
+        audio_play(SOUND_MONK_NOTE, 1.0f);
         bullet_spawn_note(&g->bullets, ex + ux * 10.0f, ey + uy * 10.0f, ux * tuning.monk_note_speed, uy * tuning.monk_note_speed,
                           tuning.monk_note_range, 1.0f, tuning.enemy_note_height);
         break;
     case ENEMY_RINGER: {
+        audio_play(SOUND_BELL, 1.0f);
         int n = SDL_max(tuning.ringer_notes, 1);
         float base = atan2f(uy, ux), step = n > 1 ? tuning.ringer_spread / (float)(n - 1) : 0.0f;
         for (int k = 0; k < n; k++) {
@@ -377,6 +380,7 @@ static void enemy_fire(Game *g, const Enemy *e, float px, float py)
         break;
     }
     case ENEMY_QUILL: {
+        audio_play(SOUND_INK_SPIT, 1.0f);
         float tx = px, ty = py;
         room_clamp_to_floor(&g->room, tuning.toxic_radius, tuning.toxic_radius * 0.5f, &tx, &ty);
         bullet_spawn_ink(&g->bullets, ex, ey, tx, ty, tuning.ink_blob_flight);
@@ -435,6 +439,7 @@ static void boss_landed(Game *g)
 /* Explosion d'un métronome : dégâts et poussée aux ennemis, dégâts au joueur s'il est dedans. */
 static void explode(Game *g, const Bomb *b)
 {
+    audio_play(SOUND_EXPLOSION, 1.0f);
     float R = tuning.bomb_radius;
     for (int j = 0; j < MAX_ENEMIES; j++) {
         Enemy *e = &g->enemies.items[j];
@@ -557,6 +562,7 @@ void game_step(Game *g, const Input *in, float dt)
 {
     g->time += dt;
     if (g->shake_timer > 0.0f) g->shake_timer -= dt;
+    if (g->cry_cooldown > 0.0f) g->cry_cooldown -= dt;
 
     /* Pendant le glissement entre deux salles, le jeu est en pause. */
     if (g->transition.active) {
@@ -585,6 +591,11 @@ void game_step(Game *g, const Input *in, float dt)
         if (!e->active) continue;
         if (e->landed) boss_landed(g);
         if (e->fire) enemy_fire(g, e, px, py);
+        if (e->dig) audio_play(SOUND_DIG, 1.0f);
+        if (e->cry && g->cry_cooldown <= 0.0f) {   /* de temps en temps, et jamais deux bébés à la fois */
+            audio_play(SDL_rand(2) ? SOUND_BABY_CRY : SOUND_BABY_SOB, e->type == ENEMY_BOSS ? tuning.boss_cry_pitch : 1.0f);
+            g->cry_cooldown = tuning.baby_cry_gap;
+        }
     }
     projectile_update_all(&g->shots, &g->room, dt);
     update_bullets(g, dt);
@@ -595,12 +606,16 @@ void game_step(Game *g, const Input *in, float dt)
         Pickup *pk = &g->pickups.items[i];
         if (pickup_reached(pk, px, py)) {
             collect(g, pk->type);
+            audio_play(pk->type == PICKUP_BOMB ? SOUND_PICKUP_BOMB : SOUND_PICKUP_COIN, 1.0f);
             pk->active = false;
         }
     }
 
     for (int i = 0; i < MAX_BOMBS; i++) {
-        if (bomb_update(&g->bombs.items[i], dt)) explode(g, &g->bombs.items[i]);
+        Bomb *b = &g->bombs.items[i];
+        bool boom = bomb_update(b, dt);
+        if (b->tick) audio_play(b->tick == 1 ? SOUND_TICK : SOUND_TOCK, 1.0f);
+        if (boom) explode(g, b);
     }
     for (int i = 0; i < MAX_HAZARDS; i++) {
         Hazard *h = &g->hazards.items[i];
