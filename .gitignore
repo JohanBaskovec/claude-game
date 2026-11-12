@@ -1,0 +1,3 @@
+# Builds CMake (ligne de commande, CLion, Emscripten)
+/build*/
+/cmake-build-*/
