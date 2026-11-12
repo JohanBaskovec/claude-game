@@ -13,6 +13,7 @@ typedef enum SpriteId {
     SPR_AMA_HEAD_FRONT,
     SPR_AMA_HEAD_FRONT_SING,
     SPR_AMA_HEAD_BACK,
+    SPR_AMA_HEAD_BACK_SING,
     SPR_AMA_HEAD_SIDE,
     SPR_AMA_HEAD_SIDE_SING,
     SPR_AMA_BODY_FRONT,       /* puis _STEP1 et _STEP2 : les deux temps de la marche */
@@ -27,11 +28,19 @@ typedef enum SpriteId {
     SPR_BABY_0,               /* trois images de marche, de profil vers la droite */
     SPR_BABY_1,
     SPR_BABY_2,
+    /* Ennemis de la phase 7 : planches PNG seulement (pas de grille de secours). */
+    SPR_MONK_0, SPR_MONK_1, SPR_MONK_SING,                 /* marche 1, marche 2, chante */
+    SPR_QUILL_0, SPR_QUILL_1, SPR_QUILL_SPIT,              /* flotte 1, flotte 2, se penche */
+    SPR_WORM_HEAD, SPR_WORM_HALF, SPR_WORM_UP_0, SPR_WORM_UP_1,
+    SPR_WORM_HOLE_BUMP, SPR_WORM_HOLE_CRACK, SPR_WORM_HOLE,
+    SPR_RINGER_0, SPR_RINGER_1, SPR_RINGER_RING,           /* marche 1, marche 2, bras levés */
+    SPR_BELL, SPR_BELL_LEFT, SPR_BELL_RIGHT,
     SPR_COUNT
 } SpriteId;
 
-/* Décalage vertical entre la ligne 0 d'une tête d'Amadeus et la ligne 0 de son corps. */
-#define AMA_HEAD_ABOVE_BODY 39
+/* Décalage vertical entre la ligne 0 d'une tête d'Amadeus et la ligne 0 de son corps
+ * (planches : le bas de la case de la tête recouvre les 8 premières lignes du corps). */
+int sprite_ama_head_above_body(void);
 
 int sprite_width(SpriteId id);
 int sprite_height(SpriteId id);

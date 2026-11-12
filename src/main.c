@@ -11,6 +11,7 @@
 
 #include "config.h"
 #include "debug_menu.h"
+#include "draw.h"
 #include "decor.h"
 #include "game.h"
 #include "input.h"
@@ -76,9 +77,9 @@ static void render(App *app, float alpha)
         SDL_SetRenderDrawColor(r, 255, 255, 255, 255);
         const FloorRoom *fr = &g->floor.rooms[g->room.index];
         static const char *kinds[] = { "", "  DEPART", "  BOSS", "  TRESOR" };
-        SDL_RenderDebugTextFormat(r, 8, GAME_H - 54, "etage %d  graine %llu  salle %d/%d (%s, %d bebes, profondeur %d)%s",
+        SDL_RenderDebugTextFormat(r, 8, GAME_H - 54, "etage %d  graine %llu  salle %d/%d (%s, %d ennemis, profondeur %d)%s",
                                   g->floor_number, (unsigned long long)g->floor.seed, g->room.index + 1,
-                                  g->floor.room_count, floor_shape_name(fr->shape), fr->babies, fr->depth,
+                                  g->floor.room_count, floor_shape_name(fr->shape), fr->spawn_count, fr->depth,
                                   kinds[fr->kind]);
         char owned[128] = "";
         for (int i = 0; i < ITEM_COUNT; i++) {
@@ -95,6 +96,10 @@ static void render(App *app, float alpha)
                                   SDL_max(g->player.invuln_timer, 0.0f));
     }
     debug_menu_render(&app->debug, r, &g->player.stats);
+
+    /* Viseur : affiché tant que la souris sert (il disparaît si on joue au clavier). */
+    float mx, my;
+    if (input_mouse_visible(&mx, &my)) draw_crosshair(r, mx, my);
 
     SDL_RenderPresent(r);
 }
@@ -126,6 +131,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_SetRenderLogicalPresentation(app->renderer, GAME_W, GAME_H,
                                      SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
     SDL_SetRenderVSync(app->renderer, 1);
+    SDL_HideCursor();   /* le jeu dessine son viseur (GDD §17) */
 
     SDL_srand(0);   /* graine aléatoire tirée de l'horloge */
     text_init_from_locale();
@@ -168,22 +174,24 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         }
     }
 
-    input_handle_event(event);
-
     /* Souris : passage des coordonnées fenêtre aux coordonnées du jeu (960x540). */
     SDL_Event local = *event;
     SDL_ConvertEventToRenderCoordinates(app->renderer, &local);
-    /* Clic sur la mini-carte : téléportation. */
+    input_handle_event(&local);
+
+    /* Clic sur la mini-carte : téléportation (et pas de tir). Clic sur le menu de debug : pas de tir. */
     if (local.type == SDL_EVENT_MOUSE_BUTTON_DOWN && local.button.button == SDL_BUTTON_LEFT) {
         int cx, cy;
         int room = minimap_room_at(&app->game.floor, local.button.x, local.button.y, app->game.reveal_map, &cx, &cy);
         if (room >= 0) {
             game_teleport(&app->game, room, cx, cy);
+            input_block_mouse();
         }
+        if (debug_menu_contains(&app->debug, local.button.x, local.button.y)) input_block_mouse();
     }
 
     switch (debug_menu_handle_event(&app->debug, &local, &app->game.player.stats)) {
-    case DEBUG_ACTION_SPAWN_BABY:    game_spawn_baby(&app->game); break;
+    case DEBUG_ACTION_SPAWN_ENEMY:   game_spawn_enemy(&app->game, (EnemyType)app->debug.enemy); break;
     case DEBUG_ACTION_NEW_FLOOR:     game_next_floor(&app->game, random_seed()); break;
     case DEBUG_ACTION_KILL_ENEMIES:  game_kill_enemies(&app->game); break;
     case DEBUG_ACTION_GIVE_ITEM:     game_give_next_item(&app->game); break;

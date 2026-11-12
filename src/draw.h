@@ -20,6 +20,9 @@ void draw_line(SDL_Renderer *r, float ax, float ay, float bx, float by, float wi
 void draw_metronome(SDL_Renderer *r, float cx, float cy, float scale, float pendulum_angle);
 void draw_crown(SDL_Renderer *r, float cx, float cy, float scale);
 
+/* Viseur de la souris (GDD §17), centré en (cx, cy) écran. */
+void draw_crosshair(SDL_Renderer *r, float cx, float cy);
+
 /* Nombre en chiffres pixel (3x5) ; renvoie la largeur dessinée. */
 float draw_number(SDL_Renderer *r, float x, float y, int value, int min_digits, float scale, SDL_Color c);
 

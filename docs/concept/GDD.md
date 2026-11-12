@@ -3,7 +3,7 @@
 > Document de travail destiné à Claude Code. Il décrit l'univers et les choix de design.
 > **Statut : en cours de conception.** Les sections marquées ✅ sont décidées, 💡 sont des idées à valider, ❓ sont des questions ouvertes.
 > **Source de vérité du design : ce fichier, dans le dépôt** (`docs/concept/GDD.md`). La conception se fait désormais uniquement avec Claude Code, qui le met à jour au fil des décisions prises avec Johan.
-> **Phase en cours : Phase 6 (section 15), implémentée, en attente de validation.** Les Phases 1 à 5 (sections 10 à 14) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
+> **Phase en cours : Phase 9 (section 18).** Les Phases 7 et 8 (sections 16 et 17) sont implémentées, à valider. Les Phases 1 à 6 (sections 10 à 15) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
 
 ---
 
@@ -98,7 +98,7 @@ Comme dans TBOI, le joueur a des attributs chiffrés que les objets modifieront.
 - **5 PV.** Contact : 1 PV de dégâts au joueur (provisoire). Plus lent que le joueur, avec de l'inertie, pour qu'on puisse l'esquiver.
 - Les notes le repoussent légèrement et le font clignoter à chaque touche.
 
-Concept visuel ✅ (planche de Johan, `assets/sprites/baby/baby_sprite_sheet.png`, cases de 25×56 px) :
+Concept visuel ✅ (planche de Johan, `assets/sprites/baby/baby.png`, cases de 25×56 px) :
 - Enfant Jésus en « petit adulte » : corps de bébé potelé, mais **visage d'adulte**. Torse nu, **en couche** (c'est plus drôle qu'un lange long).
 - Visage de vieillard : calvitie, rides, regard en coin méfiant, bouche pincée.
 - Auréole légère derrière la tête. Pas de geste de bénédiction.
@@ -559,7 +559,7 @@ Cinq objets pour tester la salle du trésor. Les noms viennent des anecdotes de 
 ### Hors périmètre (ne pas faire)
 Les autres neumes et objets de polyphonie, les armes des autres époques, l'apparence d'Amadeus selon l'arme, les sons, les graphismes finaux.
 
-## 15. PHASE 6 — Vrais graphismes : décor, Amadeus, bébé ✅ (implémentée, à valider)
+## 15. PHASE 6 — Vrais graphismes : décor, Amadeus, bébé ✅ (terminée)
 
 **But** : remplacer les placeholders de ce qu'on voit tout le temps par les vrais graphismes en pixel art, d'après la section 9 et les prototypes de `docs/concept/outils_concept/`.
 
@@ -573,7 +573,7 @@ Les autres neumes et objets de polyphonie, les armes des autres époques, l'appa
 - **Décor calculé en C** par le jeu au début de chaque étage (procédural, comme les prototypes) : chaque salle est dessinée une fois dans une texture, puis affichée. Aucun fichier image.
 - **Police du sol** : Junicode (fichier TTF chargé via `SDL_IOStream`), rendue avec `stb_truetype` (un seul fichier C, domaine public).
 - **Sprites écrits comme grilles de caractères** dans le code (une lettre = une couleur de la palette) : lisibles et retouchables dans un éditeur de texte. Le chargement de PNG (Aseprite) pourra venir plus tard.
-- ✅ **Planches de sprites faites par Johan** : générées par une IA puis nettoyées dans LibreSprite. Elles remplacent les grilles de caractères, qui restent en secours (le jeu les utilise si le PNG manque). Le bébé est le premier chargé depuis sa planche ; marche à 0,15 s par image, en aller-retour 1-2-3-2 (`tuning.baby_walk_frame`, `tuning.baby_walk_pingpong`).
+- ✅ **Planches de sprites faites par Johan** : générées par une IA puis nettoyées dans LibreSprite. Elles remplacent les grilles de caractères, qui restent en secours (le jeu les utilise si le PNG manque). Amadeus et le bébé sont chargés depuis leurs planches (tête et corps centrés chacun sur les pieds) ; bébé : marche à 0,15 s par image, en aller-retour 1-2-3-2 (`tuning.baby_walk_frame`, `tuning.baby_walk_pingpong`).
 - ✅ **Format des planches** (dans `assets/sprites/`) :
   - PNG en RGBA 32 bits, fond vraiment transparent, alpha tout ou rien sur le contour du personnage (pas de bords semi-transparents) ; seul un effet voulu, comme une auréole, peut rester translucide ;
   - **1 pixel de l'image = 1 pixel du jeu**, à la taille exacte (pas d'image agrandie en « faux pixels ») ;
@@ -581,13 +581,13 @@ Les autres neumes et objets de polyphonie, les armes des autres époques, l'appa
   - contour sombre de 1 px ; pas de limite stricte de couleurs : on garde le modelé de l'image (une réduction à ~32 couleurs ne se voit presque pas et nettoie les pixels parasites, mais elle est facultative) ;
   - dans chaque case, le personnage est centré horizontalement et ses pieds touchent le bas de la case, à la même place d'une image à l'autre ;
   - les profils regardent à droite (le jeu fait le miroir pour la gauche).
-- ✅ **Planches attendues** :
+- ✅ **Planches** (chemins relatifs à `assets/sprites/`, déclarés dans la table `SHEETS` de `sprite.c`) :
 
   | Fichier | Case | Lignes | Colonnes |
   |---|---|---|---|
-  | `amadeus_head.png` | 56×48 | face, dos, profil droit | repos, chante (dos : repos seulement) |
-  | `amadeus_body.png` | 56×32 | face, dos, profil droit | repos, pas 1, pas 2 |
-  | `baby/baby_sprite_sheet.png` | 25×56 | une seule | 3 images de marche (ordre de lecture à juger en jeu : 1-2-3-2 proposé) |
+  | `amadeus/amadeus_head.png` | 56×48 | face, dos, profil droit | repos, chante (de dos : la tête se soulève) |
+  | `amadeus/amadeus_body.png` | 40×32 | face, dos, profil droit | repos, pas 1, pas 2 |
+  | `baby/baby.png` | 25×56 | une seule | 3 images de marche (ordre de lecture à juger en jeu : 1-2-3-2 proposé) |
 
   - La tête est posée sur le corps : le bas de la case de la tête recouvre les 8 premières lignes de la case du corps (le menton passe devant le col). Amadeus fait donc au plus 72 px de haut.
   - L'éclair blanc des dégâts et le clignotement sont calculés par le jeu : pas d'image à faire.
@@ -603,4 +603,89 @@ Les autres neumes et objets de polyphonie, les armes des autres époques, l'appa
 - **Fichiers** : la police Junicode est rangée dans `assets/fonts/` (avec sa licence), copiée à côté de l'exécutable.
 
 ### Hors périmètre (ne pas faire)
-Le Gros Bébé, les objets, les armes, les prix, les meubles (lutrins, coffre, trappe), les tirs et l'interface (phase 7) ; les animations au-delà de la marche et du chant ; les autres époques.
+Le Gros Bébé, les objets, les armes, les prix, les meubles (lutrins, coffre, trappe), les tirs et l'interface (phase ultérieure) ; les animations au-delà de la marche et du chant ; les autres époques.
+
+## 16. PHASE 7 — Ennemis du premier étage (implémentée, à valider)
+
+**But** : peupler le Haut Moyen Âge avec quatre nouveaux ennemis, dont trois qui tirent. Il faut donc des **tirs ennemis** et de l'**encre toxique** au sol.
+
+### Tirs ennemis ✅
+- Un pool à part de celui d'Amadeus (`bullet.c`). Un tir ennemi blesse Amadeus (1 PV, puis l'invincibilité habituelle) et disparaît au contact ou contre un mur. Les notes d'Amadeus ne les détruisent pas.
+- Ils se distinguent des notes d'Amadeus (roses) : **notes carrées rouges** à hampe (neumes carrés). Celles du sonneur sont plus grosses et volent plus haut (elles partent de la cloche).
+
+### Moine chanteur ✅
+- Chante des phrases : une rafale de 4 notes visées sur Amadeus, puis une pause. Cadence et vitesse rapides, mais moins qu'Amadeus : 2,5 notes/s à 340 px/s (Amadeus : 3 notes/s à 480 px/s), pause de 1,4 à 2,2 s.
+- Garde ses distances : s'approche au-delà de 260 px, recule en deçà de 170 px. Lent (70 px/s). 6 PV.
+- Bouche ouverte pendant la rafale.
+
+### Plume géante ✅
+- Une plume d'oie plantée sur sa pointe, avec des yeux. Se déplace par petits bonds vers des points au hasard près d'Amadeus. 5 PV.
+- Toutes les 2,5 à 3,5 s : s'arrête, se penche en arrière (0,4 s), puis **crache une goutte d'encre en cloche** vers l'endroit où se trouve Amadeus. L'ombre de la goutte au sol annonce l'impact (vol de 0,9 s).
+- À l'impact : **flaque d'encre toxique** (verdâtre, avec des bulles), qui dure 4 s et retire 1 PV à Amadeus s'il marche dedans. Elle ne gêne pas les ennemis.
+
+### Ver de livre ✅
+- Sous le sol, il est invisible et intouchable (les portes restent fermées tant qu'il vit).
+- Cycle : caché (1 à 2 s) → **le sol se soulève et se fissure** là où se trouve Amadeus, à 24 px près (0,9 s, pour avoir le temps de s'écarter) → il **jaillit** (blesse au contact) → reste dehors 1,4 s, où on peut le toucher → replonge (0,25 s) → caché.
+- Larve pâle de ver de livre, avec de petites lunettes rondes. 4 PV. Les tirs ne le repoussent pas ; étourdi, il reste dehors.
+
+### Sonneur de cloche ✅
+- Marche lentement (55 px/s), garde au moins 150 px avec Amadeus. Sa **cloche lévite au-dessus de sa tête**. 10 PV.
+- Toutes les 2,6 à 3,2 s : la cloche se balance (0,5 s, pour prévenir), puis sonne et lance un **éventail de 3 grosses notes très lentes** (110 px/s).
+
+### Pour tous ✅
+- Les tireurs regardent Amadeus. Étourdis, ils ne bougent plus et ne tirent plus ; ralentis par l'encre (Liquescence), ils marchent moins vite.
+- **Composition des salles** : même nombre d'ennemis qu'avant, chaque ennemi tiré au hasard (graine de l'étage) avec des poids : bébé 4, moine 2, plume 2, ver 2, sonneur 1.
+- Toutes les valeurs sont des réglages (`tuning`), à ajuster en jouant.
+
+### Sprites temporaires ✅
+- Claude dessine des planches PNG provisoires dans `assets/sprites/<perso>/<perso>.png` (même format que celles de Johan, profil vers la droite), que Johan remplacera. Elles sont produites par un outil jetable hors du dépôt.
+
+  | Fichier | Case | Images |
+  |---|---|---|
+  | `monk/monk.png` | 36×60 | marche 1, marche 2, chante |
+  | `quill/quill.png` | 32×64 | flotte 1, flotte 2, se penche (crache) |
+  | `worm/worm.png` | 32×48 | sort (tête), à moitié, dehors 1, dehors 2 |
+  | `worm/worm_hole.png` | 48×24 | sol soulevé, sol fissuré, trou |
+  | `bellringer/bellringer.png` | 36×60 | marche 1, marche 2, bras levés (sonne) |
+  | `bellringer/bell.png` | 28×28 | immobile, penchée à gauche, penchée à droite |
+
+### Debug
+- **F2** : le bouton « Ajouter » fait apparaître l'ennemi choisi sur la ligne « Ennemi ».
+
+### Hors périmètre (ne pas faire)
+Les autres ennemis du §8 (blemmyes, cynocéphales, sciapodes, chapiteaux…), les nouveaux boss, les sons, les tirs ennemis détruits par les notes.
+
+## 17. PHASE 8 — Visée libre à la souris (implémentée, à valider)
+
+**But** : pouvoir viser dans n'importe quelle direction, pas seulement les 4 des flèches.
+
+### Commandes ✅
+- **Clic gauche maintenu** : Amadeus chante vers le curseur, dans n'importe quelle direction (cadence, charge de la flûte et toutes les armes comme avec les flèches).
+- Les **flèches restent** (4 directions). Si une flèche est enfoncée, elle l'emporte sur la souris.
+- La note part de la bouche d'Amadeus et passe sous le curseur (on vise depuis la hauteur de vol des notes, pas depuis ses pieds).
+- La **tête** regarde du côté où il tire (face, dos ou profil : la direction la plus proche).
+- **Flûte** : on charge en gardant le clic, le tir part au relâchement, vers le curseur à ce moment-là.
+- Un clic sur la mini-carte (téléportation) ou sur le menu de debug ne tire pas.
+
+### Curseur ✅
+- Le curseur du système est remplacé par un **viseur** dessiné par le jeu. Il disparaît si la souris ne bouge pas pendant quelques secondes (on joue alors au clavier).
+
+### Hors périmètre (ne pas faire)
+- **Manette** (joystick droit pour viser) : plus tard, elle utilisera la même visée libre.
+- Viser au clavier en diagonale.
+
+## 18. PHASE 9 — Les ennemis explosent
+
+**But** : rendre les morts plus satisfaisantes, dans le ton d'humour noir du jeu.
+
+### Mort d'un ennemi ✅
+- L'ennemi **explose** : un éclat bref, puis des gouttes projetées tout autour, qui retombent sur le sol.
+- Il laisse une **grande tache** là où il est mort, et chaque goutte fait une petite tache là où elle tombe.
+- Couleur : **sang rouge** pour tous (bébés, moine, sonneur, Gros Bébé), **sang vert** pour le ver de livre, **encre noire** pour la plume.
+- Le Gros Bébé explose plus fort (plus de gouttes, plus loin, plus grande tache).
+- Les taches restent dans la salle tant qu'on y est ; elles disparaissent quand on la quitte (comme les flaques et les tirs).
+- « Tuer les ennemis » (F2) les fait exploser aussi.
+- Les taches ne font rien (ni dégâts, ni ralentissement) : c'est du décor.
+
+### Hors périmètre (ne pas faire)
+Les taches qui restent quand on revient dans une salle, les morceaux d'ennemis (os, auréoles, plumes), les sons.

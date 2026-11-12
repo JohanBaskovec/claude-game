@@ -13,7 +13,7 @@
 /* Actions que le menu demande au jeu. */
 typedef enum DebugAction {
     DEBUG_ACTION_NONE,
-    DEBUG_ACTION_SPAWN_BABY,
+    DEBUG_ACTION_SPAWN_ENEMY,   /* l'ennemi choisi sur la ligne « Ennemi » (DebugMenu.enemy) */
     DEBUG_ACTION_NEW_FLOOR,
     DEBUG_ACTION_KILL_ENEMIES,
     DEBUG_ACTION_GIVE_ITEM,
@@ -24,6 +24,7 @@ typedef struct DebugMenu {
     int   hover;         /* bouton sous la souris, -1 si aucun */
     int   pressed;       /* bouton maintenu enfoncé, -1 si aucun */
     float repeat_timer;  /* répétition automatique quand on garde le bouton enfoncé */
+    int   enemy;         /* ennemi que « Ajouter » fait apparaître (EnemyType) */
 } DebugMenu;
 
 void debug_menu_init(DebugMenu *m);
@@ -35,6 +36,9 @@ DebugAction debug_menu_handle_event(DebugMenu *m, const SDL_Event *event, Player
 
 /* Gère la répétition quand un bouton reste enfoncé. */
 void debug_menu_update(DebugMenu *m, float dt, PlayerStats *stats);
+
+/* Vrai si le menu est ouvert et que (x, y) est sur son panneau. */
+bool debug_menu_contains(const DebugMenu *m, float x, float y);
 
 void debug_menu_render(const DebugMenu *m, SDL_Renderer *renderer, const PlayerStats *stats);
 

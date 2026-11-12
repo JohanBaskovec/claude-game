@@ -20,49 +20,60 @@ void enemy_pool_clear(EnemyPool *pool)
     }
 }
 
-Enemy *enemy_spawn_baby(EnemyPool *pool, float x, float y)
+/* PV et boîte de collision de chaque type. */
+static void type_stats(EnemyType type, float *hp, float *w, float *h)
+{
+    *hp = tuning.baby_hp;
+    *w = tuning.baby_hitbox_w;
+    *h = tuning.baby_hitbox_h;
+    switch (type) {
+    case ENEMY_BOSS:   *hp = tuning.boss_hp; *w = tuning.boss_hitbox_w; *h = tuning.boss_hitbox_h; break;
+    case ENEMY_MONK:   *hp = tuning.monk_hp; break;
+    case ENEMY_QUILL:  *hp = tuning.quill_hp; *w = tuning.quill_hitbox_w; *h = tuning.quill_hitbox_h; break;
+    case ENEMY_WORM:   *hp = tuning.worm_hp; *w = tuning.worm_hitbox_w; *h = tuning.worm_hitbox_h; break;
+    case ENEMY_RINGER: *hp = tuning.ringer_hp; break;
+    default: break;
+    }
+}
+
+Enemy *enemy_spawn(EnemyPool *pool, EnemyType type, float x, float y)
 {
     for (int i = 0; i < MAX_ENEMIES; i++) {
         Enemy *e = &pool->items[i];
-        if (!e->active) {
-            *e = (Enemy){ 0 };
-            e->active = true;
-            e->type = ENEMY_BABY;
-            e->box.w = tuning.baby_hitbox_w;
-            e->box.h = tuning.baby_hitbox_h;
-            e->box.x = x - e->box.w * 0.5f;
-            e->box.y = y - e->box.h * 0.5f;
-            e->prev_x = e->box.x;
-            e->prev_y = e->box.y;
-            e->hp = e->max_hp = tuning.baby_hp;
-            e->anim_time = SDL_randf() * 10.0f;   /* pour qu'ils ne se dandinent pas en rythme */
-            return e;
+        if (e->active) continue;
+        *e = (Enemy){ 0 };
+        e->active = true;
+        e->type = type;
+        type_stats(type, &e->hp, &e->box.w, &e->box.h);
+        e->max_hp = e->hp;
+        e->box.x = x - e->box.w * 0.5f;
+        e->box.y = y - e->box.h * 0.5f;
+        e->prev_x = e->box.x;
+        e->prev_y = e->box.y;
+        e->anim_time = SDL_randf() * 10.0f;   /* pour qu'ils ne se dandinent pas en rythme */
+        e->target_x = x;
+        e->target_y = y;
+        switch (type) {
+        case ENEMY_BOSS:
+            e->state = BOSS_WANDER;
+            e->state_dur = 1.0f;   /* petite pause avant de bouger */
+            e->jump_timer = rand_range(tuning.boss_jump_min_delay, tuning.boss_jump_max_delay);
+            break;
+        case ENEMY_WORM:
+            e->state = WORM_HIDDEN;
+            e->state_dur = rand_range(0.5f, 1.5f);
+            break;
+        default:
+            /* Les tireurs attendent un peu avant leur premier tir, et pas tous en même temps. */
+            e->action_timer = rand_range(1.0f, 2.2f);
+            break;
         }
+        return e;
     }
     return NULL;
 }
 
-Enemy *enemy_spawn_boss(EnemyPool *pool, float x, float y)
-{
-    Enemy *e = enemy_spawn_baby(pool, x, y);
-    if (!e) return NULL;
-    e->type = ENEMY_BOSS;
-    e->box.w = tuning.boss_hitbox_w;
-    e->box.h = tuning.boss_hitbox_h;
-    e->box.x = x - e->box.w * 0.5f;
-    e->box.y = y - e->box.h * 0.5f;
-    e->prev_x = e->box.x;
-    e->prev_y = e->box.y;
-    e->hp = e->max_hp = tuning.boss_hp;
-    e->state = BOSS_WANDER;
-    e->state_dur = 1.0f;   /* petite pause avant de bouger */
-    e->target_x = x;
-    e->target_y = y;
-    e->jump_timer = rand_range(tuning.boss_jump_min_delay, tuning.boss_jump_max_delay);
-    return e;
-}
-
-Enemy *enemy_spawn_baby_away_from(EnemyPool *pool, const Room *room, float avoid_x, float avoid_y)
+Enemy *enemy_spawn_away_from(EnemyPool *pool, const Room *room, EnemyType type, float avoid_x, float avoid_y)
 {
     const float margin = 40.0f;
     float x = 0.0f, y = 0.0f;
@@ -81,7 +92,13 @@ Enemy *enemy_spawn_baby_away_from(EnemyPool *pool, const Room *room, float avoid
             break;
         }
     }
-    return enemy_spawn_baby(pool, x, y);
+    return enemy_spawn(pool, type, x, y);
+}
+
+void enemy_center(const Enemy *e, float *x, float *y)
+{
+    *x = e->box.x + e->box.w * 0.5f;
+    *y = e->box.y + e->box.h * 0.5f;
 }
 
 static float approach(float v, float target, float time_constant, float dt)
@@ -97,7 +114,7 @@ static void separate(EnemyPool *pool, const Room *room)
 {
     for (int i = 0; i < MAX_ENEMIES; i++) {
         Enemy *a = &pool->items[i];
-        if (!a->active || !enemy_tangible(a)) continue;
+        if (!a->active || !enemy_tangible(a) || a->type == ENEMY_WORM) continue;   /* le ver reste dans son trou */
         for (int j = i + 1; j < MAX_ENEMIES; j++) {
             Enemy *b = &pool->items[j];
             if (!b->active || !enemy_tangible(b)) continue;
@@ -219,6 +236,155 @@ static void boss_update(Enemy *e, const Room *room, float dt)
     if (e->state != BOSS_WANDER) e->vx = e->vy = 0.0f;
 }
 
+/* Regarde vers le joueur, avec un peu de marge pour ne pas se retourner sans cesse. */
+static void face(Enemy *e, float dx)
+{
+    if (dx < -4.0f) e->face_left = true;
+    else if (dx > 4.0f) e->face_left = false;
+}
+
+static float slowed(const Enemy *e, float speed)
+{
+    return speed * (e->slow_timer > 0.0f ? tuning.ink_slow : 1.0f);
+}
+
+/* Tireurs : s'approche au-delà de `far`, recule en deçà de `near`, sinon reste sur place. */
+static void keep_distance(Enemy *e, const Room *room, float px, float py, float speed, float near, float far, float dt)
+{
+    float cx, cy;
+    enemy_center(e, &cx, &cy);
+    float dx = px - cx, dy = py - cy, len = sqrtf(dx * dx + dy * dy);
+    float tx = 0.0f, ty = 0.0f;
+    if (len > 1.0f && e->stun_timer <= 0.0f) {
+        float k = len > far ? 1.0f : (len < near ? -1.0f : 0.0f);
+        tx = dx / len * slowed(e, speed) * k;
+        ty = dy / len * slowed(e, speed) * k;
+        face(e, dx);
+    }
+    move(e, room, tx, ty, tuning.baby_accel_time, dt);
+}
+
+/* Moine chanteur : rafales de notes visées sur le joueur, en gardant ses distances. */
+static void monk_update(Enemy *e, const Room *room, float px, float py, float dt)
+{
+    keep_distance(e, room, px, py, tuning.monk_speed, tuning.monk_near, tuning.monk_far, dt);
+    if (e->stun_timer > 0.0f) return;
+    e->action_timer -= dt;
+    if (e->action_timer <= 1e-4f) {
+        if (e->burst_left <= 0) e->burst_left = SDL_max(tuning.monk_burst, 1);
+        e->fire = true;
+        e->sing_timer = tuning.enemy_sing_time;
+        e->burst_left--;
+        e->action_timer = e->burst_left > 0 ? tuning.monk_note_interval : rand_range(tuning.monk_pause_min, tuning.monk_pause_max);
+    }
+}
+
+/* Plume géante : petits bonds autour du joueur ; s'arrête, se penche et crache une goutte d'encre. */
+static void quill_update(Enemy *e, const Room *room, float px, float py, float dt)
+{
+    float cx, cy;
+    enemy_center(e, &cx, &cy);
+    face(e, px - cx);
+    if (e->stun_timer > 0.0f) {
+        move(e, room, 0.0f, 0.0f, tuning.baby_accel_time, dt);
+        return;
+    }
+    if (e->state == SHOOTER_WINDUP) {
+        move(e, room, 0.0f, 0.0f, 0.05f, dt);
+        if (e->state_time >= tuning.quill_windup - 1e-4f) {
+            e->fire = true;
+            e->state = SHOOTER_MOVE;
+            e->state_time = 0.0f;
+            e->action_timer = rand_range(tuning.quill_spit_min, tuning.quill_spit_max);
+        }
+        return;
+    }
+    float dx = e->target_x - cx, dy = e->target_y - cy, len = sqrtf(dx * dx + dy * dy);
+    if (len < 10.0f) {
+        /* Nouveau point au hasard près du joueur. */
+        e->target_x = px + rand_range(-150.0f, 150.0f);
+        e->target_y = py + rand_range(-90.0f, 90.0f);
+        room_clamp_to_floor(room, 40.0f, 40.0f, &e->target_x, &e->target_y);
+        dx = e->target_x - cx;
+        dy = e->target_y - cy;
+        len = sqrtf(dx * dx + dy * dy);
+    }
+    float tx = 0.0f, ty = 0.0f;
+    if (len > 1.0f) {
+        tx = dx / len * slowed(e, tuning.quill_speed);
+        ty = dy / len * slowed(e, tuning.quill_speed);
+    }
+    float ox = e->box.x, oy = e->box.y;
+    move(e, room, tx, ty, tuning.baby_accel_time, dt);
+    if (len >= 10.0f && fabsf(e->box.x - ox) + fabsf(e->box.y - oy) < 0.01f) {
+        e->target_x = cx;   /* coincée : elle choisira un autre point au prochain pas */
+        e->target_y = cy;
+    }
+    e->action_timer -= dt;
+    if (e->action_timer <= 1e-4f) {
+        e->state = SHOOTER_WINDUP;
+        e->state_time = 0.0f;
+    }
+}
+
+static void worm_set_state(Enemy *e, WormState s, float dur)
+{
+    e->state = s;
+    e->state_time = 0.0f;
+    e->state_dur = dur;
+}
+
+/* Ver de livre : caché, il choisit l'endroit où est le joueur ; le sol s'y soulève, puis il jaillit. */
+static void worm_update(Enemy *e, const Room *room, float px, float py, float dt)
+{
+    e->vx = e->vy = 0.0f;
+    float cx, cy;
+    enemy_center(e, &cx, &cy);
+    face(e, px - cx);
+    /* Étourdi dehors, il y reste. */
+    if (e->stun_timer > 0.0f && e->state == WORM_UP) e->state_time -= dt;
+    if (e->state_time < e->state_dur - 1e-4f) return;
+
+    switch (e->state) {
+    case WORM_HIDDEN: {
+        float a = SDL_randf() * 2.0f * SDL_PI_F, d = SDL_randf() * tuning.worm_aim_jitter;
+        float x = px + cosf(a) * d, y = py + sinf(a) * d;
+        room_clamp_to_floor(room, e->box.w * 0.5f + 16.0f, e->box.h * 0.5f + 16.0f, &x, &y);
+        e->box.x = e->prev_x = x - e->box.w * 0.5f;
+        e->box.y = e->prev_y = y - e->box.h * 0.5f;
+        worm_set_state(e, WORM_WARN, tuning.worm_warn_time);
+        break;
+    }
+    case WORM_WARN:   worm_set_state(e, WORM_EMERGE, tuning.worm_emerge_time); break;
+    case WORM_EMERGE: worm_set_state(e, WORM_UP, tuning.worm_up_time); break;
+    case WORM_UP:     worm_set_state(e, WORM_DIVE, tuning.worm_dive_time); break;
+    default:          worm_set_state(e, WORM_HIDDEN, rand_range(tuning.worm_hidden_min, tuning.worm_hidden_max)); break;
+    }
+}
+
+/* Sonneur de cloche : avance lentement ; sa cloche se balance, puis sonne un éventail de grosses notes. */
+static void ringer_update(Enemy *e, const Room *room, float px, float py, float dt)
+{
+    bool windup = e->state == SHOOTER_WINDUP;
+    keep_distance(e, room, px, py, windup ? 0.0f : tuning.ringer_speed, tuning.ringer_keep, tuning.ringer_keep + 90.0f, dt);
+    if (e->stun_timer > 0.0f) return;
+    if (windup) {
+        if (e->state_time >= tuning.ringer_windup - 1e-4f) {
+            e->fire = true;
+            e->sing_timer = 0.35f;   /* la cloche vibre encore un peu */
+            e->state = SHOOTER_MOVE;
+            e->state_time = 0.0f;
+            e->action_timer = rand_range(tuning.ringer_ring_min, tuning.ringer_ring_max);
+        }
+        return;
+    }
+    e->action_timer -= dt;
+    if (e->action_timer <= 1e-4f) {
+        e->state = SHOOTER_WINDUP;
+        e->state_time = 0.0f;
+    }
+}
+
 void enemy_update_all(EnemyPool *pool, const Room *room, float target_x, float target_y, float dt)
 {
     for (int i = 0; i < MAX_ENEMIES; i++) {
@@ -231,11 +397,16 @@ void enemy_update_all(EnemyPool *pool, const Room *room, float target_x, float t
         if (e->hurt_timer > 0.0f) e->hurt_timer -= dt;
         if (e->stun_timer > 0.0f) e->stun_timer -= dt;
         if (e->slow_timer > 0.0f) e->slow_timer -= dt;
+        if (e->sing_timer > 0.0f) e->sing_timer -= dt;
+        e->fire = false;
 
-        if (e->type == ENEMY_BOSS) {
-            boss_update(e, room, dt);
-        } else {
-            baby_update(e, room, target_x, target_y, dt);
+        switch (e->type) {
+        case ENEMY_BOSS:   boss_update(e, room, dt); break;
+        case ENEMY_MONK:   monk_update(e, room, target_x, target_y, dt); break;
+        case ENEMY_QUILL:  e->state_time += dt; quill_update(e, room, target_x, target_y, dt); break;
+        case ENEMY_WORM:   e->state_time += dt; worm_update(e, room, target_x, target_y, dt); break;
+        case ENEMY_RINGER: e->state_time += dt; ringer_update(e, room, target_x, target_y, dt); break;
+        default:           baby_update(e, room, target_x, target_y, dt); break;
         }
     }
     separate(pool, room);
@@ -253,7 +424,10 @@ void enemy_slow(Enemy *e, float seconds)
 
 bool enemy_tangible(const Enemy *e)
 {
-    return e->active && !(e->type == ENEMY_BOSS && e->state == BOSS_AIR);
+    if (!e->active) return false;
+    if (e->type == ENEMY_BOSS) return e->state != BOSS_AIR;
+    if (e->type == ENEMY_WORM) return e->state != WORM_HIDDEN && e->state != WORM_WARN;
+    return true;
 }
 
 int enemy_contact_damage(const Enemy *e)
@@ -274,7 +448,7 @@ bool enemy_hurt(Enemy *e, float damage, float kx, float ky)
     if (!enemy_tangible(e)) return false;
     e->hp -= damage;
     e->hurt_timer = tuning.enemy_hurt_flash;
-    if (e->type != ENEMY_BOSS) {   /* le Gros Bébé est trop lourd pour reculer */
+    if (e->type != ENEMY_BOSS && e->type != ENEMY_WORM) {   /* trop lourd, ou planté dans son trou */
         e->vx += kx;
         e->vy += ky;
     }
@@ -300,9 +474,8 @@ float enemy_feet_y(const Enemy *e, float alpha)
 }
 
 /*
- * Bébé médiéval (GDD §4) : proportions d'adulte, visage de vieillard, nimbe crucifère,
- * bénédiction à deux doigts, lange. Il se dandine sur ses jambes raides et clignote
- * en blanc quand il est touché. Le sprite regarde à droite.
+ * Bébé médiéval (GDD §4) : visage de vieillard, auréole, couche. Il marche en trois
+ * images et clignote en blanc quand il est touché. Le sprite regarde à droite.
  */
 static void baby_render(const Enemy *e, SDL_Renderer *r, float alpha, Camera cam)
 {
@@ -317,6 +490,114 @@ static void baby_render(const Enemy *e, SDL_Renderer *r, float alpha, Camera cam
     SpriteId id = PINGPONG[step];
     float top = feet - (float)(sprite_bottom(id) + 1);
     sprite_draw(r, id, cx - (float)(sprite_width(id) / 2), top, e->face_left, e->hurt_timer > 0.0f);
+}
+
+/* Position à l'écran : centre et pieds, interpolés. */
+static void screen_pos(const Enemy *e, float alpha, Camera cam, float *cx, float *feet)
+{
+    *cx = SDL_floorf(e->prev_x + (e->box.x - e->prev_x) * alpha + e->box.w * 0.5f - cam.x);
+    *feet = SDL_floorf(e->prev_y + (e->box.y - e->prev_y) * alpha + e->box.h - cam.y);
+}
+
+/* Case de planche posée par son bas sur les pieds, `lift` px plus haut. */
+static void draw_on_feet(const Enemy *e, SDL_Renderer *r, SpriteId id, float cx, float feet, float lift, bool flip)
+{
+    float top = feet - (float)sprite_height(id) - SDL_floorf(lift);
+    sprite_draw(r, id, cx - (float)(sprite_width(id) / 2), top, flip, e->hurt_timer > 0.0f);
+}
+
+static bool walking(const Enemy *e)
+{
+    return fabsf(e->vx) + fabsf(e->vy) > 8.0f;
+}
+
+static int walk_frame(const Enemy *e, float period)
+{
+    return walking(e) ? (int)(e->anim_time / period) % 2 : 0;
+}
+
+static void monk_render(const Enemy *e, SDL_Renderer *r, float alpha, Camera cam)
+{
+    float cx, feet;
+    screen_pos(e, alpha, cam, &cx, &feet);
+    SpriteId id = e->sing_timer > 0.0f ? SPR_MONK_SING : (SpriteId)(SPR_MONK_0 + walk_frame(e, 0.22f));
+    draw_on_feet(e, r, id, cx, feet, 0.0f, e->face_left);
+}
+
+/* La plume flotte un peu au-dessus du sol et sautille quand elle avance. */
+static float quill_lift(const Enemy *e)
+{
+    float lift = 3.0f + 2.0f * sinf(e->anim_time * 3.0f);
+    if (walking(e)) lift += fabsf(sinf(e->anim_time * 9.0f)) * 6.0f;
+    return lift;
+}
+
+static void quill_render(const Enemy *e, SDL_Renderer *r, float alpha, Camera cam)
+{
+    float cx, feet;
+    screen_pos(e, alpha, cam, &cx, &feet);
+    SpriteId id = e->state == SHOOTER_WINDUP ? SPR_QUILL_SPIT : (SpriteId)(SPR_QUILL_0 + (int)(e->anim_time / 0.3f) % 2);
+    draw_on_feet(e, r, id, cx, feet, quill_lift(e), e->face_left);
+}
+
+/* Le ver sort de son trou : la case est posée sur le trou, le bas du corps reste dedans. */
+static void worm_render(const Enemy *e, SDL_Renderer *r, float alpha, Camera cam)
+{
+    float cx, feet;
+    screen_pos(e, alpha, cam, &cx, &feet);
+    float u = e->state_dur > 0.0f ? e->state_time / e->state_dur : 1.0f;
+    SpriteId id;
+    switch (e->state) {
+    case WORM_EMERGE: id = u < 0.5f ? SPR_WORM_HEAD : SPR_WORM_HALF; break;
+    case WORM_UP:     id = (SpriteId)(SPR_WORM_UP_0 + (int)(e->anim_time / 0.2f) % 2); break;
+    case WORM_DIVE:   id = u < 0.5f ? SPR_WORM_HALF : SPR_WORM_HEAD; break;
+    default:          return;   /* sous le sol */
+    }
+    draw_on_feet(e, r, id, cx, feet - 4.0f, 0.0f, e->face_left);   /* bas de la case au milieu du trou */
+}
+
+static void worm_render_ground(const Enemy *e, SDL_Renderer *r, float alpha, Camera cam)
+{
+    if (e->state == WORM_HIDDEN) return;
+    float cx, feet;
+    screen_pos(e, alpha, cam, &cx, &feet);
+    SpriteId id = SPR_WORM_HOLE;
+    float shake = 0.0f;
+    if (e->state == WORM_WARN) {
+        bool late = e->state_time >= e->state_dur * 0.5f;
+        id = late ? SPR_WORM_HOLE_CRACK : SPR_WORM_HOLE_BUMP;
+        shake = SDL_roundf(sinf(e->anim_time * 70.0f) * (late ? 1.5f : 0.8f));   /* le sol tremble */
+    }
+    sprite_draw(r, id, cx - (float)(sprite_width(id) / 2) + shake, feet + 6.0f - (float)sprite_height(id), false, false);
+}
+
+static void ringer_render(const Enemy *e, SDL_Renderer *r, float alpha, Camera cam)
+{
+    float cx, feet;
+    screen_pos(e, alpha, cam, &cx, &feet);
+    bool windup = e->state == SHOOTER_WINDUP;
+    SpriteId body = (windup || e->sing_timer > 0.0f) ? SPR_RINGER_RING : (SpriteId)(SPR_RINGER_0 + walk_frame(e, 0.26f));
+    draw_on_feet(e, r, body, cx, feet, 0.0f, e->face_left);
+    /* Cloche en lévitation au-dessus de la tête : elle se balance avant de sonner, puis vibre. */
+    SpriteId bell = SPR_BELL;
+    if (windup)                  bell = (SpriteId)(SPR_BELL_LEFT + (int)(e->state_time / 0.09f) % 2);
+    else if (e->sing_timer > 0.0f) bell = (SpriteId)(SPR_BELL_LEFT + (int)(e->sing_timer / 0.04f) % 2);
+    float bob = SDL_roundf(sinf(e->anim_time * 2.5f) * 2.0f);
+    float bell_bottom = feet - (float)sprite_height(body) + 4.0f + bob;
+    sprite_draw(r, bell, cx - (float)(sprite_width(bell) / 2), bell_bottom - (float)sprite_height(bell), false, e->hurt_timer > 0.0f);
+}
+
+/* Hauteur au-dessus des pieds où tournent les étoiles d'étourdissement. */
+static float stun_height(const Enemy *e)
+{
+    switch (e->type) {
+    case ENEMY_BOSS:   return 150.0f;
+    case ENEMY_MONK:   return 64.0f;
+    case ENEMY_QUILL:  return 72.0f;
+    case ENEMY_WORM:   return 48.0f;
+    case ENEMY_RINGER: return 92.0f;
+    default:           return 58.0f;
+    }
 }
 
 /* Le Gros Bébé est dessiné dans un repère (cx, feet) étiré par (sx, sy) :
@@ -475,6 +756,15 @@ void enemy_render_shadow(const Enemy *e, SDL_Renderer *r, float alpha, Camera ca
     float x = e->prev_x + (e->box.x - e->prev_x) * alpha + e->box.w * 0.5f - cam.x;
     float feet = e->prev_y + (e->box.y - e->prev_y) * alpha + e->box.h - cam.y;
 
+    if (e->type == ENEMY_WORM) {
+        worm_render_ground(e, r, alpha, cam);
+        return;
+    }
+    if (e->type == ENEMY_QUILL) {
+        float k = 1.0f - quill_lift(e) / 30.0f;   /* plus petite quand elle saute */
+        draw_ellipse(r, x, feet - 2.0f, 11.0f * k, 3.0f * k, shadow);
+        return;
+    }
     if (e->type != ENEMY_BOSS) {
         draw_ellipse(r, x, feet - 2.0f, 15.0f, 4.0f, shadow);
         return;
@@ -495,10 +785,13 @@ void enemy_render_shadow(const Enemy *e, SDL_Renderer *r, float alpha, Camera ca
 
 void enemy_render(const Enemy *e, SDL_Renderer *r, float alpha, Camera cam)
 {
-    if (e->type == ENEMY_BOSS) {
-        boss_render(e, r, alpha, cam);
-    } else {
-        baby_render(e, r, alpha, cam);
+    switch (e->type) {
+    case ENEMY_BOSS:   boss_render(e, r, alpha, cam); break;
+    case ENEMY_MONK:   monk_render(e, r, alpha, cam); break;
+    case ENEMY_QUILL:  quill_render(e, r, alpha, cam); break;
+    case ENEMY_WORM:   worm_render(e, r, alpha, cam); break;
+    case ENEMY_RINGER: ringer_render(e, r, alpha, cam); break;
+    default:           baby_render(e, r, alpha, cam); break;
     }
     float x = e->prev_x + (e->box.x - e->prev_x) * alpha + e->box.w * 0.5f - cam.x;
     float feet = e->prev_y + (e->box.y - e->prev_y) * alpha + e->box.h - cam.y;
@@ -508,7 +801,7 @@ void enemy_render(const Enemy *e, SDL_Renderer *r, float alpha, Camera cam)
     }
     /* Étourdi : trois étoiles tournent au-dessus de sa tête. */
     if (e->stun_timer > 0.0f && enemy_tangible(e)) {
-        float top = feet - (e->type == ENEMY_BOSS ? 150.0f : 58.0f);
+        float top = feet - stun_height(e);
         for (int k = 0; k < 3; k++) {
             float a = e->anim_time * tuning.stun_star_hz * 2.0f * SDL_PI_F + (float)k * 2.0f * SDL_PI_F / 3.0f;
             float sx = x + cosf(a) * 14.0f, sy = top + sinf(a) * 4.0f;

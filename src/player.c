@@ -37,7 +37,8 @@ void player_init(Player *p, float center_x, float center_y)
     p->invuln_timer = 0.0f;
     p->charge = 0.0f;
     p->charging = false;
-    p->charge_dir = DIR_NONE;
+    p->charge_x = 0.0f;
+    p->charge_y = 1.0f;
     p->lock_timer = 0.0f;
     p->walk_phase = 0.0f;
 }
@@ -52,8 +53,17 @@ static float approach(float v, float target, float time_constant, float dt)
     return v + (target - v) * k;
 }
 
-PlayerFire player_update(Player *p, const Input *in, const Room *room, float fire_rate, float charge_time, float dt)
+/* Direction la plus proche parmi les 4 (pour choisir le sprite de la tête). */
+static Dir nearest_dir(float x, float y)
 {
+    if (fabsf(x) >= fabsf(y)) return x > 0.0f ? DIR_RIGHT : DIR_LEFT;
+    return y > 0.0f ? DIR_DOWN : DIR_UP;
+}
+
+PlayerFire player_update(Player *p, const Input *in, float aim_x, float aim_y, const Room *room,
+                         float fire_rate, float charge_time, float dt)
+{
+    bool shooting = aim_x != 0.0f || aim_y != 0.0f;
     p->prev_x = p->box.x;
     p->prev_y = p->box.y;
 
@@ -86,14 +96,10 @@ PlayerFire player_update(Player *p, const Input *in, const Room *room, float fir
     }
 
     /* Direction de la tête : le tir prime, sinon le déplacement. */
-    if (in->shoot != DIR_NONE) {
-        p->look = in->shoot;
+    if (shooting) {
+        p->look = nearest_dir(aim_x, aim_y);
     } else if (moving) {
-        if (fabsf(mx) > fabsf(my)) {
-            p->look = mx > 0.0f ? DIR_RIGHT : DIR_LEFT;
-        } else {
-            p->look = my > 0.0f ? DIR_DOWN : DIR_UP;
-        }
+        p->look = nearest_dir(mx, my);
     }
 
     if (p->sing_timer > 0.0f) {
@@ -103,18 +109,22 @@ PlayerFire player_update(Player *p, const Input *in, const Room *room, float fir
         p->invuln_timer -= dt;
     }
 
-    PlayerFire fired = { DIR_NONE, 1.0f };
+    PlayerFire fired = { false, 0.0f, 0.0f, 1.0f };
 
-    /* Arme à charger : on charge en tenant une flèche, le tir part au relâchement. */
+    /* Arme à charger : on charge en tenant une flèche ou le clic, le tir part au relâchement,
+     * dans la dernière direction visée. */
     if (charge_time > 0.0f) {
-        if (in->shoot != DIR_NONE) {
+        if (shooting) {
             if (p->fire_cooldown <= 1e-4f) {
                 p->charging = true;
                 p->charge = SDL_min(p->charge + dt / charge_time, 1.0f);
-                p->charge_dir = in->shoot;
+                p->charge_x = aim_x;
+                p->charge_y = aim_y;
             }
         } else if (p->charging) {
-            fired.dir = p->charge_dir;
+            fired.fire = true;
+            fired.dx = p->charge_x;
+            fired.dy = p->charge_y;
             fired.charge = p->charge;
             p->charging = false;
             p->charge = 0.0f;
@@ -128,14 +138,16 @@ PlayerFire player_update(Player *p, const Input *in, const Room *room, float fir
     p->charge = 0.0f;
 
     /* Cadence de tir. Petite tolérance : évite qu'une erreur d'arrondi décale un tir d'une image. */
-    if (in->shoot != DIR_NONE && p->fire_cooldown <= 1e-4f) {
+    if (shooting && p->fire_cooldown <= 1e-4f) {
         /* += plutôt que = : la cadence reste exacte quel que soit le pas. */
         p->fire_cooldown += 1.0f / fire_rate;
         p->sing_timer = tuning.sing_duration;
-        fired.dir = in->shoot;
+        fired.fire = true;
+        fired.dx = aim_x;
+        fired.dy = aim_y;
     }
     p->fire_cooldown -= dt;
-    if (p->fire_cooldown < 0.0f && (in->shoot == DIR_NONE || p->fire_cooldown < -dt)) {
+    if (p->fire_cooldown < 0.0f && (!shooting || p->fire_cooldown < -dt)) {
         p->fire_cooldown = 0.0f; /* pas de « réserve » de tirs accumulée à l'arrêt */
     }
     return fired;
@@ -203,11 +215,12 @@ void player_render(const Player *p, SDL_Renderer *renderer, float alpha, Camera 
 
     /* Tête : direction du tir, bouche ouverte quand il chante ; elle descend d'un pixel à chaque pas. */
     bool sing = p->sing_timer > 0.0f;
-    SpriteId head = facing(p->look, SPR_AMA_HEAD_BACK,
+    SpriteId head = facing(p->look, sing ? SPR_AMA_HEAD_BACK_SING : SPR_AMA_HEAD_BACK,
                            sing ? SPR_AMA_HEAD_FRONT_SING : SPR_AMA_HEAD_FRONT,
                            sing ? SPR_AMA_HEAD_SIDE_SING : SPR_AMA_HEAD_SIDE);
-    float head_top = body_top - AMA_HEAD_ABOVE_BODY + (frame ? 1.0f : 0.0f);
-    sprite_draw(renderer, head, left, head_top, p->look == DIR_LEFT, false);
+    float head_left = cx - (float)(sprite_width(head) / 2);
+    float head_top = body_top - (float)sprite_ama_head_above_body() + (frame ? 1.0f : 0.0f);
+    sprite_draw(renderer, head, head_left, head_top, p->look == DIR_LEFT, false);
 
     /* Jauge de charge (flûte) au-dessus de la tête. */
     if (p->charging && p->charge > 0.0f) {

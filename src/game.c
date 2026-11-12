@@ -40,15 +40,33 @@ static void place_player(Game *g, float cx, float cy)
     p->prev_y = p->box.y;
 }
 
-void game_spawn_baby(Game *g)
+void game_spawn_enemy(Game *g, EnemyType type)
 {
     float px, py;
     player_center(&g->player, &px, &py);
-    enemy_spawn_baby_away_from(&g->enemies, &g->room, px, py);
+    if (type == ENEMY_BOSS) {
+        room_middle(&g->room, &px, &py);
+        enemy_spawn(&g->enemies, ENEMY_BOSS, px, py);
+        return;
+    }
+    enemy_spawn_away_from(&g->enemies, &g->room, type, px, py);
+}
+
+/* Un ennemi meurt : il explose en sang (vert pour le ver, encre pour la plume). GDD §18. */
+static void enemy_died(Game *g, const Enemy *e)
+{
+    SplatColor color = e->type == ENEMY_WORM ? SPLAT_GREEN : (e->type == ENEMY_QUILL ? SPLAT_INK : SPLAT_BLOOD);
+    bool boss = e->type == ENEMY_BOSS;
+    float x = e->box.x + e->box.w * 0.5f, y = e->box.y + e->box.h * 0.5f;
+    splatter_burst(&g->splatter, x, y, boss ? 60.0f : 24.0f, boss ? tuning.splat_boss_scale : 1.0f, color);
 }
 
 void game_kill_enemies(Game *g)
 {
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        Enemy *e = &g->enemies.items[i];
+        if (e->active && enemy_tangible(e)) enemy_died(g, e);   /* un ver caché ou un boss en l'air disparaît sans bruit */
+    }
     enemy_pool_clear(&g->enemies);
 }
 
@@ -92,10 +110,12 @@ static void enter_room(Game *g, int index, float entry_x, float entry_y)
     place_player(g, entry_x, entry_y);
     free_player_from_props(g);
     projectile_pool_clear(&g->shots);
+    bullet_pool_clear(&g->bullets);
     enemy_pool_clear(&g->enemies);
     pickup_pool_clear(&g->pickups);
     bomb_pool_clear(&g->bombs);
     hazard_pool_clear(&g->hazards);
+    splatter_clear(&g->splatter);
     g->trapdoor_armed = false;
     g->socle_armed = false;
     g->shake_timer = 0.0f;
@@ -105,10 +125,10 @@ static void enter_room(Game *g, int index, float entry_x, float entry_y)
         if (fr->kind == ROOM_BOSS) {
             float mx, my;
             room_middle(&g->room, &mx, &my);
-            enemy_spawn_boss(&g->enemies, mx, my);
+            enemy_spawn(&g->enemies, ENEMY_BOSS, mx, my);
         }
-        for (int i = 0; i < fr->babies; i++) {
-            game_spawn_baby(g);
+        for (int i = 0; i < fr->spawn_count; i++) {
+            game_spawn_enemy(g, (EnemyType)fr->spawns[i]);
         }
     }
     bool empty = enemy_count(&g->enemies) == 0;
@@ -245,8 +265,7 @@ static void fire(Game *g, PlayerFire f)
         return;
     }
 
-    float dx, dy, cx, cy;
-    dir_vector(f.dir, &dx, &dy);
+    float dx = f.dx, dy = f.dy, cx, cy;
     player_center(p, &cx, &cy);
     ShotSpec s = weapon_shot(&p->stats, g->owned, f.charge);
     if (tuning.weapons[p->stats.weapon].lock_time > 0.0f) {
@@ -287,18 +306,8 @@ static void fire(Game *g, PlayerFire f)
 /* Flaque d'encre ramenée sur le sol (une note arrêtée par un mur finit dans le mur). */
 static void drop_ink(Game *g, float x, float y)
 {
-    float mx = tuning.ink_radius + 2.0f, my = tuning.ink_radius * 0.5f + 2.0f, best = 1e18f, bx = x, by = y;
-    for (int i = 0; i < g->room.cell_count; i++) {
-        const SDL_FRect *c = &g->room.cells[i];
-        float cx = SDL_clamp(x, c->x + mx, c->x + c->w - mx), cy = SDL_clamp(y, c->y + my, c->y + c->h - my);
-        float d = (cx - x) * (cx - x) + (cy - y) * (cy - y);
-        if (d < best) {
-            best = d;
-            bx = cx;
-            by = cy;
-        }
-    }
-    hazard_spawn_ink(&g->hazards, bx, by);
+    room_clamp_to_floor(&g->room, tuning.ink_radius + 2.0f, tuning.ink_radius * 0.5f + 2.0f, &x, &y);
+    hazard_spawn_ink(&g->hazards, x, y);
 }
 
 /* Tirs contre ennemis. Une note disparaît au premier ennemi touché ; les ondes et le rayon
@@ -322,7 +331,7 @@ static void resolve_shots_vs_enemies(Game *g)
                 ky = len > 0.0f ? ey / len : 1.0f;
             }
             if (pr->stun > 0.0f) enemy_stun(e, pr->stun);
-            enemy_hurt(e, pr->damage, kx * tuning.shot_knockback, ky * tuning.shot_knockback);
+            if (enemy_hurt(e, pr->damage, kx * tuning.shot_knockback, ky * tuning.shot_knockback)) enemy_died(g, e);
             if (projectile_pierces(pr)) {
                 pr->hits |= bit;
                 continue;
@@ -340,6 +349,56 @@ static void resolve_shots_vs_enemies(Game *g)
             pr->ink_drop = false;
         }
     }
+}
+
+/* Un ennemi tire (GDD §16) : notes du moine, éventail du sonneur, goutte d'encre de la plume. */
+static void enemy_fire(Game *g, const Enemy *e, float px, float py)
+{
+    float ex, ey;
+    enemy_center(e, &ex, &ey);
+    float dx = px - ex, dy = py - ey, len = sqrtf(dx * dx + dy * dy);
+    float ux = len > 0.0f ? dx / len : 0.0f, uy = len > 0.0f ? dy / len : 1.0f;
+    switch (e->type) {
+    case ENEMY_MONK:
+        bullet_spawn_note(&g->bullets, ex + ux * 10.0f, ey + uy * 10.0f, ux * tuning.monk_note_speed, uy * tuning.monk_note_speed,
+                          tuning.monk_note_range, 1.0f, tuning.enemy_note_height);
+        break;
+    case ENEMY_RINGER: {
+        int n = SDL_max(tuning.ringer_notes, 1);
+        float base = atan2f(uy, ux), step = n > 1 ? tuning.ringer_spread / (float)(n - 1) : 0.0f;
+        for (int k = 0; k < n; k++) {
+            float a = base + ((float)k - (float)(n - 1) * 0.5f) * step;
+            bullet_spawn_note(&g->bullets, ex + cosf(a) * 12.0f, ey + sinf(a) * 12.0f,
+                              cosf(a) * tuning.ringer_note_speed, sinf(a) * tuning.ringer_note_speed,
+                              tuning.ringer_note_range, tuning.ringer_note_size, tuning.enemy_note_height + 24.0f);
+        }
+        break;
+    }
+    case ENEMY_QUILL: {
+        float tx = px, ty = py;
+        room_clamp_to_floor(&g->room, tuning.toxic_radius, tuning.toxic_radius * 0.5f, &tx, &ty);
+        bullet_spawn_ink(&g->bullets, ex, ey, tx, ty, tuning.ink_blob_flight);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+/* Tirs ennemis : avancent, blessent le joueur au contact ; une goutte d'encre laisse une flaque toxique. */
+static void update_bullets(Game *g, float dt)
+{
+    for (int i = 0; i < MAX_BULLETS; i++) {
+        Bullet *b = &g->bullets.items[i];
+        if (bullet_update(b, &g->room, dt)) hazard_spawn_toxic(&g->hazards, b->to_x, b->to_y);
+        if (bullet_hits_box(b, &g->player.box)) {
+            player_hurt(&g->player, tuning.enemy_shot_damage);
+            b->active = false;
+        }
+    }
+    /* Encre toxique sous les pieds du joueur. */
+    float fx = g->player.box.x + g->player.box.w * 0.5f, fy = g->player.box.y + g->player.box.h * 0.5f;
+    if (hazard_in(&g->hazards, HAZARD_TOXIC, fx, fy)) player_hurt(&g->player, tuning.toxic_damage);
 }
 
 /* Ennemis contre joueur : dégâts au contact, sauf pendant l'invincibilité. */
@@ -383,7 +442,7 @@ static void explode(Game *g, const Bomb *b)
         float reach = R + SDL_min(e->box.w, e->box.h) * 0.5f;
         if (d > reach) continue;
         float kx = d > 0.0f ? dx / d : 0.0f, ky = d > 0.0f ? dy / d : 1.0f;
-        enemy_hurt(e, tuning.bomb_damage, kx * tuning.bomb_knockback, ky * tuning.bomb_knockback);
+        if (enemy_hurt(e, tuning.bomb_damage, kx * tuning.bomb_knockback, ky * tuning.bomb_knockback)) enemy_died(g, e);
     }
     float px, py;
     player_center(&g->player, &px, &py);
@@ -469,6 +528,29 @@ static void room_cleared(Game *g)
     }
 }
 
+/* Direction du tir (GDD §17) : la flèche enfoncée, sinon le clic gauche vers le curseur ;
+ * (0, 0) si on ne tire pas. On vise depuis la hauteur de vol des notes, pour qu'elles passent sous le curseur. */
+static void aim_direction(const Game *g, const Input *in, float *ax, float *ay)
+{
+    *ax = *ay = 0.0f;
+    if (in->shoot != DIR_NONE) {
+        dir_vector(in->shoot, ax, ay);
+        return;
+    }
+    if (!in->aim_mouse) return;
+    Camera cam = game_camera(g, 1.0f);
+    float px, py;
+    player_center(&g->player, &px, &py);
+    float dx = in->mouse_x + cam.x - px, dy = in->mouse_y + cam.y - (py - tuning.shot_height);
+    float len = sqrtf(dx * dx + dy * dy);
+    if (len < 1.0f) {
+        dir_vector(g->player.look, ax, ay);   /* curseur sur la bouche : droit devant */
+        return;
+    }
+    *ax = dx / len;
+    *ay = dy / len;
+}
+
 void game_step(Game *g, const Input *in, float dt)
 {
     g->time += dt;
@@ -483,7 +565,9 @@ void game_step(Game *g, const Input *in, float dt)
         return;
     }
 
-    PlayerFire shot = player_update(&g->player, in, &g->room, weapon_fire_rate(&g->player.stats),
+    float aim_x, aim_y;
+    aim_direction(g, in, &aim_x, &aim_y);
+    PlayerFire shot = player_update(&g->player, in, aim_x, aim_y, &g->room, weapon_fire_rate(&g->player.stats),
                                     weapon_charge_time(&g->player.stats), dt);
     float px, py;
     player_center(&g->player, &px, &py);
@@ -495,9 +579,14 @@ void game_step(Game *g, const Input *in, float dt)
 
     enemy_update_all(&g->enemies, &g->room, px, py, dt);
     for (int i = 0; i < MAX_ENEMIES; i++) {
-        if (g->enemies.items[i].active && g->enemies.items[i].landed) boss_landed(g);
+        const Enemy *e = &g->enemies.items[i];
+        if (!e->active) continue;
+        if (e->landed) boss_landed(g);
+        if (e->fire) enemy_fire(g, e, px, py);
     }
     projectile_update_all(&g->shots, &g->room, dt);
+    update_bullets(g, dt);
+    splatter_update(&g->splatter, &g->room, dt);
 
     pickup_update_all(&g->pickups, px, py, dt);
     for (int i = 0; i < MAX_PICKUPS; i++) {
@@ -522,14 +611,14 @@ void game_step(Game *g, const Input *in, float dt)
     /* Encre : les ennemis qui marchent dedans sont ralentis. */
     for (int i = 0; i < MAX_ENEMIES; i++) {
         Enemy *e = &g->enemies.items[i];
-        if (enemy_tangible(e) && hazard_in_ink(&g->hazards, e->box.x + e->box.w * 0.5f, e->box.y + e->box.h)) {
+        if (enemy_tangible(e) && hazard_in(&g->hazards, HAZARD_INK, e->box.x + e->box.w * 0.5f, e->box.y + e->box.h)) {
             enemy_slow(e, 0.15f);
         }
     }
 
     resolve_shots_vs_enemies(g);
     resolve_enemies_vs_player(g);
-    if (shot.dir != DIR_NONE) {
+    if (shot.fire) {
         fire(g, shot);
         resolve_shots_vs_enemies(g);   /* la cloche et l'orgue frappent dès le tir */
     }
@@ -610,12 +699,14 @@ static void render_prop(const Game *g, SDL_Renderer *r, int i, Camera cam)
 static void render_room_contents(const Game *g, SDL_Renderer *r, float alpha, Camera cam)
 {
     room_render(&g->room, r, cam);
+    splatter_render_ground(&g->splatter, r, alpha, cam);
 
     /* Au sol : ombres des briques et des ennemis. */
     for (int i = 0; i < MAX_HAZARDS; i++) hazard_render_ground(&g->hazards.items[i], r, cam);
     for (int i = 0; i < MAX_ENEMIES; i++) {
         if (g->enemies.items[i].active) enemy_render_shadow(&g->enemies.items[i], r, alpha, cam);
     }
+    for (int i = 0; i < MAX_BULLETS; i++) bullet_render_shadow(&g->bullets.items[i], r, alpha, cam);
 
     DrawItem items[MAX_DRAW_ITEMS];
     int n = 0;
@@ -647,6 +738,8 @@ static void render_room_contents(const Game *g, SDL_Renderer *r, float alpha, Ca
     /* Par-dessus : briques qui tombent, notes, explosions. */
     for (int i = 0; i < MAX_HAZARDS; i++) hazard_render_air(&g->hazards.items[i], r, cam);
     projectile_render_all(&g->shots, r, alpha, cam);
+    for (int i = 0; i < MAX_BULLETS; i++) bullet_render(&g->bullets.items[i], r, alpha, cam);
+    splatter_render_air(&g->splatter, r, alpha, cam);
     for (int i = 0; i < MAX_BOMBS; i++) bomb_render_explosion(&g->bombs.items[i], r, cam);
 }
 

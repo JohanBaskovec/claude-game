@@ -278,6 +278,23 @@ void room_random_floor_point(const Room *room, float margin, float *x, float *y)
     *y = c->y + margin + SDL_randf() * (c->h - 2.0f * margin);
 }
 
+void room_clamp_to_floor(const Room *room, float mx, float my, float *x, float *y)
+{
+    float best = 1e18f, bx = *x, by = *y;
+    for (int i = 0; i < room->cell_count; i++) {
+        const SDL_FRect *c = &room->cells[i];
+        float cx = SDL_clamp(*x, c->x + mx, c->x + c->w - mx), cy = SDL_clamp(*y, c->y + my, c->y + c->h - my);
+        float d = (cx - *x) * (cx - *x) + (cy - *y) * (cy - *y);
+        if (d < best) {
+            best = d;
+            bx = cx;
+            by = cy;
+        }
+    }
+    *x = bx;
+    *y = by;
+}
+
 void room_center(const Room *room, float *x, float *y)
 {
     *x = room->cells[0].x + room->cells[0].w * 0.5f;

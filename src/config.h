@@ -20,6 +20,21 @@
 #define MAX_PICKUPS  16
 #define MAX_BOMBS    16
 #define MAX_HAZARDS  48
+#define MAX_BULLETS  128   /* tirs ennemis */
+#define MAX_DROPS    320   /* gouttes de sang ou d'encre en vol (GDD §18) */
+#define MAX_STAINS   192   /* taches sur le sol ; les plus vieilles sont remplacées */
+#define MAX_BURSTS   16    /* éclats au moment des morts */
+
+/* Ennemis (GDD §4, §13 et §16). */
+typedef enum EnemyType {
+    ENEMY_BABY,     /* bébé médiéval : suit le joueur, blesse au contact */
+    ENEMY_BOSS,     /* Gros Bébé, boss du premier étage */
+    ENEMY_MONK,     /* moine chanteur : rafales de notes */
+    ENEMY_QUILL,    /* plume géante : crache de l'encre toxique */
+    ENEMY_WORM,     /* ver de livre : surgit du sol sous le joueur */
+    ENEMY_RINGER,   /* sonneur de cloche : grosses notes lentes */
+    ENEMY_TYPE_COUNT
+} EnemyType;
 
 /* Armes (GDD §4 et §14). */
 typedef enum WeaponId {
@@ -110,9 +125,10 @@ typedef struct Tuning {
     int   floor_max_rooms;
     float floor_big_room_chance;      /* probabilité de tenter une grande salle */
     int   floor_min_big_rooms;        /* au moins tant de grandes salles par étage */
-    int   room_max_babies;            /* salle normale : 0 à N bébés ... */
+    int   room_max_babies;            /* salle normale : 0 à N ennemis ... */
     int   room_babies_per_extra_cell; /* ... + tant par cellule supplémentaire */
     int   boss_room_babies;           /* bébés en plus du boss */
+    int   spawn_weight[ENEMY_TYPE_COUNT]; /* chances relatives de chaque ennemi dans une salle normale */
     float room_transition_time;       /* glissement d'une salle à l'autre, s */
 
     /* Prix de fin de salle (GDD §13) */
@@ -181,6 +197,67 @@ typedef struct Tuning {
     float beam_time;                  /* durée d'affichage du rayon de l'orgue, s */
     float beam_width;                 /* px */
     float stun_star_hz;               /* étoiles des ennemis étourdis, tours/s */
+
+    /* Ennemis du premier étage (GDD §16) */
+    int   enemy_shot_damage;          /* PV retirés par un tir ennemi */
+    float enemy_note_height;          /* hauteur de vol des notes ennemies (affichage), px */
+    float enemy_sing_time;            /* bouche ouverte après une note, s */
+
+    float monk_hp;
+    float monk_speed;                 /* px/s */
+    float monk_near;                  /* recule en deçà, px */
+    float monk_far;                   /* s'approche au-delà, px */
+    int   monk_burst;                 /* notes par rafale */
+    float monk_note_interval;         /* s entre deux notes d'une rafale */
+    float monk_note_speed;            /* px/s */
+    float monk_note_range;            /* px */
+    float monk_pause_min;             /* entre deux rafales, s */
+    float monk_pause_max;
+
+    float quill_hp;
+    float quill_speed;                /* px/s */
+    float quill_hitbox_w;
+    float quill_hitbox_h;
+    float quill_spit_min;             /* entre deux crachats, s */
+    float quill_spit_max;
+    float quill_windup;               /* se penche avant de cracher, s */
+    float ink_blob_flight;            /* vol de la goutte, s */
+    float toxic_time;                 /* durée de la flaque toxique, s */
+    float toxic_radius;               /* px */
+    int   toxic_damage;               /* PV retirés quand on marche dedans */
+
+    float worm_hp;
+    float worm_hitbox_w;
+    float worm_hitbox_h;
+    float worm_hidden_min;            /* caché sous le sol, s */
+    float worm_hidden_max;
+    float worm_warn_time;             /* le sol se soulève avant qu'il sorte, s */
+    float worm_emerge_time;           /* il jaillit, s */
+    float worm_up_time;               /* reste dehors, s */
+    float worm_dive_time;             /* replonge, s */
+    float worm_aim_jitter;            /* sort à tant de px près de la position du joueur */
+
+    float ringer_hp;
+    float ringer_speed;               /* px/s */
+    float ringer_keep;                /* garde au moins cette distance, px */
+    float ringer_ring_min;            /* entre deux coups de cloche, s */
+    float ringer_ring_max;
+    float ringer_windup;              /* la cloche se balance avant de sonner, s */
+    int   ringer_notes;               /* notes de l'éventail */
+    float ringer_spread;              /* angle total de l'éventail, rad */
+    float ringer_note_speed;          /* px/s */
+    float ringer_note_range;          /* px */
+    float ringer_note_size;           /* taille de la note (1 = note du moine) */
+
+    /* Morts des ennemis (GDD §18) : valeurs pour un bébé, multipliées pour le Gros Bébé */
+    int   splat_drops;                /* gouttes projetées */
+    float splat_stain_radius;         /* grande tache là où il meurt, px */
+    float splat_speed_min;            /* vitesse des gouttes au sol, px/s */
+    float splat_speed_max;
+    float splat_up_min;               /* vitesse vers le haut, px/s */
+    float splat_up_max;
+    float splat_gravity;              /* px/s² */
+    float splat_boss_scale;           /* le Gros Bébé explose tant de fois plus fort */
 
     /* Barre de vie (soufflet de crescendo) */
     float hud_bar_base_len;    /* longueur du soufflet, px ... */

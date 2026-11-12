@@ -162,6 +162,20 @@ static int distinct_neighbours(const FloorRoom *room)
 }
 
 /* Une tentative de génération. Renvoie false si l'étage ne convient pas. */
+/* Ennemi d'une salle normale, tiré selon tuning.spawn_weight (GDD §16). */
+static int pick_enemy(Uint64 *rng)
+{
+    int total = 0;
+    for (int t = 0; t < ENEMY_TYPE_COUNT; t++) total += SDL_max(tuning.spawn_weight[t], 0);
+    if (total <= 0) return ENEMY_BABY;
+    int k = SDL_rand_r(rng, total);
+    for (int t = 0; t < ENEMY_TYPE_COUNT; t++) {
+        k -= SDL_max(tuning.spawn_weight[t], 0);
+        if (k < 0) return t;
+    }
+    return ENEMY_BABY;
+}
+
 static bool attempt(Floor *f, Uint64 *rng)
 {
     clear(f);
@@ -222,18 +236,22 @@ static bool attempt(Floor *f, Uint64 *rng)
 
     for (int r = 0; r < f->room_count; r++) {
         FloorRoom *room = &f->rooms[r];
+        room->spawn_count = 0;
         if (r == f->start) {
             room->kind = ROOM_START;
-            room->babies = 0;
         } else if (r == f->boss) {
             room->kind = ROOM_BOSS;
-            room->babies = tuning.boss_room_babies;
+            for (int i = 0; i < tuning.boss_room_babies && room->spawn_count < ROOM_MAX_SPAWNS; i++) {
+                room->spawns[room->spawn_count++] = ENEMY_BABY;
+            }
         } else if (r == f->treasure) {
             room->kind = ROOM_TREASURE;
-            room->babies = 0;
         } else {
-            room->babies = SDL_rand_r(rng, tuning.room_max_babies + 1)
-                         + tuning.room_babies_per_extra_cell * (room->cell_count - 1);
+            int n = SDL_rand_r(rng, tuning.room_max_babies + 1)
+                  + tuning.room_babies_per_extra_cell * (room->cell_count - 1);
+            for (int i = 0; i < n && room->spawn_count < ROOM_MAX_SPAWNS; i++) {
+                room->spawns[room->spawn_count++] = (Uint8)pick_enemy(rng);
+            }
         }
     }
     return true;

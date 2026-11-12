@@ -31,14 +31,15 @@ typedef struct Player {
     float     invuln_timer; /* > 0 : invincible (clignote) */
     float     charge;       /* tir à charger : 0..1 */
     bool      charging;
-    Dir       charge_dir;
+    float     charge_x, charge_y; /* direction du tir en charge (vecteur unitaire) */
     float     lock_timer;   /* > 0 : cloué sur place (orgue) */
     float     walk_phase;   /* animation de marche : avance d'un temps tous les player_step_dist px */
 } Player;
 
 /* Tir demandé par le joueur pendant un pas. */
 typedef struct PlayerFire {
-    Dir   dir;      /* DIR_NONE si aucun tir */
+    bool  fire;     /* faux si aucun tir */
+    float dx, dy;   /* direction (vecteur unitaire, n'importe quel angle) */
     float charge;   /* 0..1 pour un tir chargé, 1 sinon */
 } PlayerFire;
 
@@ -47,9 +48,11 @@ void player_init(Player *p, float center_x, float center_y);
 /* Valeurs de départ des attributs, lues dans tuning. */
 PlayerStats player_start_stats(void);
 
-/* Avance d'un pas. fire_rate : tirs par seconde de l'arme ; charge_time > 0 : arme
+/* Avance d'un pas. (aim_x, aim_y) : direction du tir demandé (flèche ou souris), vecteur unitaire,
+ * ou (0, 0) si on ne tire pas. fire_rate : tirs par seconde de l'arme ; charge_time > 0 : arme
  * à charger (on tire en relâchant). Renvoie le tir qui part pendant ce pas. */
-PlayerFire player_update(Player *p, const Input *in, const Room *room, float fire_rate, float charge_time, float dt);
+PlayerFire player_update(Player *p, const Input *in, float aim_x, float aim_y, const Room *room,
+                         float fire_rate, float charge_time, float dt);
 
 void player_center(const Player *p, float *x, float *y);
 

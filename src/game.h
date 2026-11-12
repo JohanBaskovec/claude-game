@@ -4,6 +4,7 @@
 #include <SDL3/SDL.h>
 
 #include "bomb.h"
+#include "bullet.h"
 #include "camera.h"
 #include "enemy.h"
 #include "floor.h"
@@ -15,6 +16,7 @@
 #include "player.h"
 #include "projectile.h"
 #include "room.h"
+#include "splatter.h"
 #include "weapon.h"
 
 /* Glissement de l'écran d'une salle à l'autre (GDD §12). */
@@ -32,10 +34,12 @@ typedef struct Game {
     Room           room;       /* salle courante : g->room.index dans g->floor */
     Player         player;
     ProjectilePool shots;
+    BulletPool     bullets;    /* tirs ennemis */
     EnemyPool      enemies;
     PickupPool     pickups;
     BombPool       bombs;
     HazardPool     hazards;
+    SplatterPool   splatter;   /* gouttes et taches des ennemis morts */
     Hud            hud;
     Transition     transition;
     int            deaths;     /* compteur, pour le debug */
@@ -72,7 +76,8 @@ bool game_can_teleport(const Game *g, int room);
 /* Téléporte au centre de la cellule (cx, cy) de la salle. Renvoie false si interdit. */
 bool game_teleport(Game *g, int room, int cx, int cy);
 
-void game_spawn_baby(Game *g);
+/* Fait apparaître un ennemi loin du joueur (debug). */
+void game_spawn_enemy(Game *g, EnemyType type);
 
 /* Debug : donne le prochain objet passif pas encore pris. */
 void game_give_next_item(Game *g);

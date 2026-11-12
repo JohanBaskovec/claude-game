@@ -12,6 +12,13 @@ static Uint64 arrow_order[DIR_COUNT];
 static Uint64 press_counter;
 static bool   bomb_pressed;   /* appui sur E pas encore consommé */
 
+/* Souris (GDD §17). */
+#define MOUSE_HIDE_NS (3 * SDL_NS_PER_SECOND)   /* le viseur disparaît si la souris ne bouge plus */
+static float  mouse_x, mouse_y;
+static bool   mouse_held;     /* bouton gauche enfoncé */
+static bool   mouse_blocked;  /* ce clic a servi à l'interface */
+static Uint64 mouse_moved_ns; /* dernier mouvement, 0 si jamais */
+
 static Dir arrow_from_scancode(SDL_Scancode sc)
 {
     switch (sc) {
@@ -43,10 +50,26 @@ void input_handle_event(const SDL_Event *event)
         }
         break;
     }
+    case SDL_EVENT_MOUSE_MOTION:
+        mouse_x = event->motion.x;
+        mouse_y = event->motion.y;
+        mouse_moved_ns = SDL_GetTicksNS();
+        break;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+        if (event->button.button == SDL_BUTTON_LEFT) {
+            mouse_x = event->button.x;
+            mouse_y = event->button.y;
+            mouse_held = event->type == SDL_EVENT_MOUSE_BUTTON_DOWN;
+            mouse_blocked = false;
+            mouse_moved_ns = SDL_GetTicksNS();
+        }
+        break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         for (int i = 0; i < DIR_COUNT; i++) {
             arrow_order[i] = 0;
         }
+        mouse_held = false;
         break;
     default:
         break;
@@ -56,7 +79,7 @@ void input_handle_event(const SDL_Event *event)
 Input input_sample(void)
 {
     const bool *keys = SDL_GetKeyboardState(NULL);
-    Input in = { 0.0f, 0.0f, DIR_NONE, bomb_pressed };
+    Input in = { 0.0f, 0.0f, DIR_NONE, bomb_pressed, mouse_held && !mouse_blocked, mouse_x, mouse_y };
     bomb_pressed = false;
 
     if (keys[SDL_SCANCODE_W]) in.move_y -= 1.0f;
@@ -79,6 +102,19 @@ Input input_sample(void)
         }
     }
     return in;
+}
+
+void input_block_mouse(void)
+{
+    mouse_blocked = true;
+}
+
+bool input_mouse_visible(float *x, float *y)
+{
+    *x = mouse_x;
+    *y = mouse_y;
+    if (mouse_held) return true;
+    return mouse_moved_ns != 0 && SDL_GetTicksNS() - mouse_moved_ns < MOUSE_HIDE_NS;
 }
 
 void dir_vector(Dir d, float *x, float *y)

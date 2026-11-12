@@ -25,6 +25,8 @@ typedef struct StatRow {
     int         decimals;
 } StatRow;
 
+static const char *const ENEMY_NAMES[ENEMY_TYPE_COUNT] = { "Bebe", "Gros Bebe", "Moine", "Plume", "Ver", "Sonneur" };
+
 static const char *const WEAPON_NAMES[WEAPON_COUNT] = { "Voix", "Olifant", "Flute", "Lyre", "Tabourin", "Cloche", "Orgue" };
 
 static const StatRow ROWS[] = {
@@ -47,7 +49,9 @@ static const StatRow ROWS[] = {
 #define BTN_FLOOR (ROW_COUNT * 2 + 2)
 #define BTN_KILL  (ROW_COUNT * 2 + 3)
 #define BTN_ITEM  (ROW_COUNT * 2 + 4)
-#define BTN_COUNT (ROW_COUNT * 2 + 5)
+#define BTN_ENEMY_PREV (ROW_COUNT * 2 + 5)   /* ligne « Ennemi » : - et + */
+#define BTN_ENEMY_NEXT (ROW_COUNT * 2 + 6)
+#define BTN_COUNT (ROW_COUNT * 2 + 7)
 
 /* Mise en page, en pixels du jeu. La police de debug fait 8x8 px. */
 #define GLYPH     8.0f
@@ -66,13 +70,14 @@ static const StatRow ROWS[] = {
 #define BABY_W    142.0f
 #define ACTION2_Y (RESET_Y + BTN_H + 6.0f)
 #define ACTION3_Y (ACTION2_Y + BTN_H + 6.0f)
-#define PANEL_H   (ACTION3_Y + BTN_H + 10.0f - PANEL_Y)
+#define ENEMY_Y   (ACTION3_Y + BTN_H + 12.0f)
+#define PANEL_H   (ENEMY_Y + BTN_H + 4.0f - PANEL_Y)
 
 #define REPEAT_DELAY 0.40f  /* s avant la répétition automatique */
 #define REPEAT_EVERY 0.06f  /* s entre deux répétitions */
 
 static const char *RESET_LABEL = "Valeurs de depart";
-static const char *BABY_LABEL  = "Ajouter un bebe";
+static const char *BABY_LABEL  = "Ajouter";
 static const char *FLOOR_LABEL = "Etage suivant";
 static const char *KILL_LABEL  = "Tuer les ennemis";
 static const char *ITEM_LABEL  = "Donner un objet";
@@ -93,6 +98,9 @@ static SDL_FRect button_rect(int id)
     }
     if (id == BTN_ITEM) {
         return (SDL_FRect){ PANEL_X + 10.0f, ACTION3_Y, RESET_W, BTN_H };
+    }
+    if (id == BTN_ENEMY_PREV || id == BTN_ENEMY_NEXT) {
+        return (SDL_FRect){ id == BTN_ENEMY_PREV ? MINUS_X : PLUS_X, ENEMY_Y - 5.0f, BTN_W, BTN_H };
     }
     int row = id / 2;
     float y = ROWS_Y + (float)row * ROW_H;
@@ -154,13 +162,18 @@ static bool button_enabled(int id, const PlayerStats *st)
     return (id % 2 == 0) ? v > row->min : v < row_max(row, st);
 }
 
-static DebugAction press(int id, PlayerStats *st)
+static DebugAction press(DebugMenu *m, int id, PlayerStats *st)
 {
+    if (id == BTN_ENEMY_PREV || id == BTN_ENEMY_NEXT) {
+        int d = id == BTN_ENEMY_NEXT ? 1 : ENEMY_TYPE_COUNT - 1;
+        m->enemy = (m->enemy + d) % ENEMY_TYPE_COUNT;
+        return DEBUG_ACTION_NONE;
+    }
     if (id == BTN_RESET) {
         *st = player_start_stats();
         return DEBUG_ACTION_NONE;
     }
-    if (id == BTN_BABY)  return DEBUG_ACTION_SPAWN_BABY;
+    if (id == BTN_BABY)  return DEBUG_ACTION_SPAWN_ENEMY;
     if (id == BTN_FLOOR) return DEBUG_ACTION_NEW_FLOOR;
     if (id == BTN_KILL)  return DEBUG_ACTION_KILL_ENEMIES;
     if (id == BTN_ITEM)  return DEBUG_ACTION_GIVE_ITEM;
@@ -181,6 +194,7 @@ void debug_menu_init(DebugMenu *m)
     m->hover = -1;
     m->pressed = -1;
     m->repeat_timer = 0.0f;
+    m->enemy = ENEMY_BABY;
 }
 
 void debug_menu_toggle(DebugMenu *m)
@@ -204,7 +218,7 @@ DebugAction debug_menu_handle_event(DebugMenu *m, const SDL_Event *event, Player
         if (event->button.button == SDL_BUTTON_LEFT) {
             m->hover = hit_test(event->button.x, event->button.y);
             if (m->hover >= 0) {
-                action = press(m->hover, stats);
+                action = press(m, m->hover, stats);
                 m->pressed = m->hover;
                 m->repeat_timer = REPEAT_DELAY;
             }
@@ -232,7 +246,7 @@ void debug_menu_update(DebugMenu *m, float dt, PlayerStats *stats)
     }
     m->repeat_timer -= dt;
     while (m->repeat_timer <= 0.0f) {
-        press(m->pressed, stats);
+        press(m, m->pressed, stats);
         m->repeat_timer += REPEAT_EVERY;
     }
 }
@@ -259,6 +273,13 @@ static void draw_button(SDL_Renderer *r, const DebugMenu *m, int id, const char 
 
     float tw = (float)strlen(label) * GLYPH;
     draw_text(r, rect.x + SDL_floorf((rect.w - tw) * 0.5f), rect.y + 5.0f, label, enabled ? 240 : 110);
+}
+
+bool debug_menu_contains(const DebugMenu *m, float x, float y)
+{
+    SDL_FRect panel = { PANEL_X, PANEL_Y, PANEL_W, PANEL_H };
+    SDL_FPoint pt = { x, y };
+    return m->open && SDL_PointInRectFloat(&pt, &panel);
 }
 
 void debug_menu_render(const DebugMenu *m, SDL_Renderer *r, const PlayerStats *stats)
@@ -302,4 +323,11 @@ void debug_menu_render(const DebugMenu *m, SDL_Renderer *r, const PlayerStats *s
     draw_button(r, m, BTN_FLOOR, FLOOR_LABEL, true);
     draw_button(r, m, BTN_KILL, KILL_LABEL, true);
     draw_button(r, m, BTN_ITEM, ITEM_LABEL, true);
+
+    /* Ennemi que fait apparaître « Ajouter ». */
+    draw_text(r, PANEL_X + 10.0f, ENEMY_Y, "Ennemi", 200);
+    const char *name = ENEMY_NAMES[m->enemy];
+    draw_text(r, VALUE_END - (float)strlen(name) * GLYPH, ENEMY_Y, name, 255);
+    draw_button(r, m, BTN_ENEMY_PREV, "-", true);
+    draw_button(r, m, BTN_ENEMY_NEXT, "+", true);
 }

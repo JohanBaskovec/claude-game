@@ -7,11 +7,6 @@
 #include "config.h"
 #include "room.h"
 
-typedef enum EnemyType {
-    ENEMY_BABY,   /* bébé médiéval : suit le joueur, blesse au contact (GDD §4) */
-    ENEMY_BOSS,   /* Gros Bébé, boss du premier étage (GDD §13) */
-} EnemyType;
-
 /* États du Gros Bébé. */
 typedef enum BossState {
     BOSS_WANDER,    /* marche vers un point au hasard, s'arrête, recommence */
@@ -19,6 +14,21 @@ typedef enum BossState {
     BOSS_AIR,       /* en l'air : intouchable, son ombre grandit là où il va tomber */
     BOSS_RECOVER,   /* se relève après l'atterrissage */
 } BossState;
+
+/* États du ver de livre (GDD §16). */
+typedef enum WormState {
+    WORM_HIDDEN,    /* sous le sol : invisible et intouchable */
+    WORM_WARN,      /* le sol se soulève et se fissure là où il va sortir */
+    WORM_EMERGE,    /* il jaillit */
+    WORM_UP,        /* dehors : on peut le toucher */
+    WORM_DIVE,      /* il replonge */
+} WormState;
+
+/* États de la plume et du sonneur : ils se déplacent, puis s'arrêtent pour tirer. */
+typedef enum ShooterState {
+    SHOOTER_MOVE,
+    SHOOTER_WINDUP, /* prévient avant de tirer (plume penchée, cloche qui se balance) */
+} ShooterState;
 
 typedef struct Enemy {
     bool      active;
@@ -34,8 +44,14 @@ typedef struct Enemy {
     float     stun_timer;     /* > 0 : étourdi, ne bouge plus */
     float     slow_timer;     /* > 0 : ralenti (encre) */
 
+    /* Comportement */
+    int       state;          /* BossState, WormState ou ShooterState selon le type */
+    float     action_timer;   /* s avant la prochaine rafale, le prochain crachat ou coup de cloche */
+    int       burst_left;     /* moine : notes restantes de la rafale */
+    float     sing_timer;     /* > 0 : bouche ouverte (moine), cloche qui sonne (sonneur) */
+    bool      fire;           /* vrai pendant le pas où il tire, lu par game.c */
+
     /* Boss */
-    BossState state;
     float     state_time;     /* s depuis le début de l'état */
     float     state_dur;      /* durée de l'état (pause, accroupi...), s */
     float     jump_timer;     /* s avant le prochain saut */
@@ -50,17 +66,17 @@ typedef struct EnemyPool {
 
 void enemy_pool_clear(EnemyPool *pool);
 
-/* Fait apparaître un bébé centré en (x, y). Renvoie NULL si le pool est plein. */
-Enemy *enemy_spawn_baby(EnemyPool *pool, float x, float y);
+/* Fait apparaître un ennemi centré en (x, y). Renvoie NULL si le pool est plein. */
+Enemy *enemy_spawn(EnemyPool *pool, EnemyType type, float x, float y);
 
-/* Fait apparaître le Gros Bébé centré en (x, y). */
-Enemy *enemy_spawn_boss(EnemyPool *pool, float x, float y);
+/* Fait apparaître un ennemi à un endroit libre du sol, loin de (avoid_x, avoid_y). */
+Enemy *enemy_spawn_away_from(EnemyPool *pool, const Room *room, EnemyType type, float avoid_x, float avoid_y);
 
-/* Fait apparaître un bébé à un endroit libre du sol, loin de (avoid_x, avoid_y). */
-Enemy *enemy_spawn_baby_away_from(EnemyPool *pool, const Room *room, float avoid_x, float avoid_y);
-
-/* Déplacements : chaque ennemi se dirige vers la cible (le joueur). */
+/* Déplacements et décisions ; la cible est le joueur. Un ennemi qui tire met `fire` à vrai. */
 void enemy_update_all(EnemyPool *pool, const Room *room, float target_x, float target_y, float dt);
+
+/* Point d'où partent ses tirs, au sol. */
+void enemy_center(const Enemy *e, float *x, float *y);
 
 /* Faux si l'ennemi ne peut ni toucher ni être touché (boss en l'air). */
 bool enemy_tangible(const Enemy *e);

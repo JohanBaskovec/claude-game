@@ -9,12 +9,32 @@
  */
 typedef enum SheetId {
     SHEET_NONE = -1,
+    SHEET_AMA_HEAD,
+    SHEET_AMA_BODY,
     SHEET_BABY,
+    SHEET_MONK,
+    SHEET_QUILL,
+    SHEET_WORM,
+    SHEET_WORM_HOLE,
+    SHEET_RINGER,
+    SHEET_BELL,
     SHEET_COUNT
 } SheetId;
 
 static const struct { const char *file; int cell_w, cell_h; } SHEETS[SHEET_COUNT] = {
-    [SHEET_BABY] = { "assets/sprites/baby/baby_sprite_sheet.png", 25, 56 },
+    /* Tête : lignes face, dos, profil droit ; colonnes repos, chante. */
+    [SHEET_AMA_HEAD] = { "assets/sprites/amadeus/amadeus_head.png", 56, 48 },
+    /* Corps : lignes face, dos, profil droit ; colonnes repos, pas 1, pas 2. */
+    [SHEET_AMA_BODY] = { "assets/sprites/amadeus/amadeus_body.png", 40, 32 },
+    /* Bébé : une ligne de trois images de marche, profil droit. */
+    [SHEET_BABY]     = { "assets/sprites/baby/baby.png", 25, 56 },
+    /* Ennemis de la phase 7 (planches provisoires) : une ligne, profil droit. */
+    [SHEET_MONK]      = { "assets/sprites/monk/monk.png", 36, 60 },
+    [SHEET_QUILL]     = { "assets/sprites/quill/quill.png", 32, 64 },
+    [SHEET_WORM]      = { "assets/sprites/worm/worm.png", 32, 48 },
+    [SHEET_WORM_HOLE] = { "assets/sprites/worm/worm_hole.png", 48, 24 },
+    [SHEET_RINGER]    = { "assets/sprites/bellringer/bellringer.png", 36, 60 },
+    [SHEET_BELL]      = { "assets/sprites/bellringer/bell.png", 28, 28 },
 };
 
 typedef struct SpriteDef {
@@ -27,25 +47,46 @@ typedef struct SpriteDef {
 
 #define DEF(grid, pal) { grid, (int)(sizeof grid / sizeof grid[0]), pal, SHEET_NONE, 0 }
 #define DEF_SHEET(grid, pal, sheet, cell) { grid, (int)(sizeof grid / sizeof grid[0]), pal, sheet, cell }
+#define DEF_PNG(sheet, cell) { NULL, 0, NULL, sheet, cell }   /* sans grille : rien à dessiner si le PNG manque */
 static const SpriteDef DEFS[SPR_COUNT] = {
-    [SPR_AMA_HEAD_FRONT]       = DEF(AMA_HEAD_FRONT, PALETTE_AMADEUS),
-    [SPR_AMA_HEAD_FRONT_SING]  = DEF(AMA_HEAD_FRONT_SING, PALETTE_AMADEUS),
-    [SPR_AMA_HEAD_BACK]        = DEF(AMA_HEAD_BACK, PALETTE_AMADEUS),
-    [SPR_AMA_HEAD_SIDE]        = DEF(AMA_HEAD_SIDE, PALETTE_AMADEUS),
-    [SPR_AMA_HEAD_SIDE_SING]   = DEF(AMA_HEAD_SIDE_SING, PALETTE_AMADEUS),
-    [SPR_AMA_BODY_FRONT]       = DEF(AMA_BODY_FRONT, PALETTE_AMADEUS),
-    [SPR_AMA_BODY_FRONT_STEP1] = DEF(AMA_BODY_FRONT_STEP1, PALETTE_AMADEUS),
-    [SPR_AMA_BODY_FRONT_STEP2] = DEF(AMA_BODY_FRONT_STEP2, PALETTE_AMADEUS),
-    [SPR_AMA_BODY_BACK]        = DEF(AMA_BODY_BACK, PALETTE_AMADEUS),
-    [SPR_AMA_BODY_BACK_STEP1]  = DEF(AMA_BODY_BACK_STEP1, PALETTE_AMADEUS),
-    [SPR_AMA_BODY_BACK_STEP2]  = DEF(AMA_BODY_BACK_STEP2, PALETTE_AMADEUS),
-    [SPR_AMA_BODY_SIDE]        = DEF(AMA_BODY_SIDE, PALETTE_AMADEUS),
-    [SPR_AMA_BODY_SIDE_STEP1]  = DEF(AMA_BODY_SIDE_STEP1, PALETTE_AMADEUS),
-    [SPR_AMA_BODY_SIDE_STEP2]  = DEF(AMA_BODY_SIDE_STEP2, PALETTE_AMADEUS),
+    [SPR_AMA_HEAD_FRONT]       = DEF_SHEET(AMA_HEAD_FRONT, PALETTE_AMADEUS, SHEET_AMA_HEAD, 0),
+    [SPR_AMA_HEAD_FRONT_SING]  = DEF_SHEET(AMA_HEAD_FRONT_SING, PALETTE_AMADEUS, SHEET_AMA_HEAD, 1),
+    [SPR_AMA_HEAD_BACK]        = DEF_SHEET(AMA_HEAD_BACK, PALETTE_AMADEUS, SHEET_AMA_HEAD, 2),
+    [SPR_AMA_HEAD_BACK_SING]   = DEF_SHEET(AMA_HEAD_BACK, PALETTE_AMADEUS, SHEET_AMA_HEAD, 3),
+    [SPR_AMA_HEAD_SIDE]        = DEF_SHEET(AMA_HEAD_SIDE, PALETTE_AMADEUS, SHEET_AMA_HEAD, 4),
+    [SPR_AMA_HEAD_SIDE_SING]   = DEF_SHEET(AMA_HEAD_SIDE_SING, PALETTE_AMADEUS, SHEET_AMA_HEAD, 5),
+    [SPR_AMA_BODY_FRONT]       = DEF_SHEET(AMA_BODY_FRONT, PALETTE_AMADEUS, SHEET_AMA_BODY, 0),
+    [SPR_AMA_BODY_FRONT_STEP1] = DEF_SHEET(AMA_BODY_FRONT_STEP1, PALETTE_AMADEUS, SHEET_AMA_BODY, 1),
+    [SPR_AMA_BODY_FRONT_STEP2] = DEF_SHEET(AMA_BODY_FRONT_STEP2, PALETTE_AMADEUS, SHEET_AMA_BODY, 2),
+    [SPR_AMA_BODY_BACK]        = DEF_SHEET(AMA_BODY_BACK, PALETTE_AMADEUS, SHEET_AMA_BODY, 3),
+    [SPR_AMA_BODY_BACK_STEP1]  = DEF_SHEET(AMA_BODY_BACK_STEP1, PALETTE_AMADEUS, SHEET_AMA_BODY, 4),
+    [SPR_AMA_BODY_BACK_STEP2]  = DEF_SHEET(AMA_BODY_BACK_STEP2, PALETTE_AMADEUS, SHEET_AMA_BODY, 5),
+    [SPR_AMA_BODY_SIDE]        = DEF_SHEET(AMA_BODY_SIDE, PALETTE_AMADEUS, SHEET_AMA_BODY, 6),
+    [SPR_AMA_BODY_SIDE_STEP1]  = DEF_SHEET(AMA_BODY_SIDE_STEP1, PALETTE_AMADEUS, SHEET_AMA_BODY, 7),
+    [SPR_AMA_BODY_SIDE_STEP2]  = DEF_SHEET(AMA_BODY_SIDE_STEP2, PALETTE_AMADEUS, SHEET_AMA_BODY, 8),
     /* La grille n'a que deux temps : le troisième reprend le premier. */
     [SPR_BABY_0]               = DEF_SHEET(BABY_0, PALETTE_BABY, SHEET_BABY, 0),
     [SPR_BABY_1]               = DEF_SHEET(BABY_1, PALETTE_BABY, SHEET_BABY, 1),
     [SPR_BABY_2]               = DEF_SHEET(BABY_0, PALETTE_BABY, SHEET_BABY, 2),
+    [SPR_MONK_0]          = DEF_PNG(SHEET_MONK, 0),
+    [SPR_MONK_1]          = DEF_PNG(SHEET_MONK, 1),
+    [SPR_MONK_SING]       = DEF_PNG(SHEET_MONK, 2),
+    [SPR_QUILL_0]         = DEF_PNG(SHEET_QUILL, 0),
+    [SPR_QUILL_1]         = DEF_PNG(SHEET_QUILL, 1),
+    [SPR_QUILL_SPIT]      = DEF_PNG(SHEET_QUILL, 2),
+    [SPR_WORM_HEAD]       = DEF_PNG(SHEET_WORM, 0),
+    [SPR_WORM_HALF]       = DEF_PNG(SHEET_WORM, 1),
+    [SPR_WORM_UP_0]       = DEF_PNG(SHEET_WORM, 2),
+    [SPR_WORM_UP_1]       = DEF_PNG(SHEET_WORM, 3),
+    [SPR_WORM_HOLE_BUMP]  = DEF_PNG(SHEET_WORM_HOLE, 0),
+    [SPR_WORM_HOLE_CRACK] = DEF_PNG(SHEET_WORM_HOLE, 1),
+    [SPR_WORM_HOLE]       = DEF_PNG(SHEET_WORM_HOLE, 2),
+    [SPR_RINGER_0]        = DEF_PNG(SHEET_RINGER, 0),
+    [SPR_RINGER_1]        = DEF_PNG(SHEET_RINGER, 1),
+    [SPR_RINGER_RING]     = DEF_PNG(SHEET_RINGER, 2),
+    [SPR_BELL]            = DEF_PNG(SHEET_BELL, 0),
+    [SPR_BELL_LEFT]       = DEF_PNG(SHEET_BELL, 1),
+    [SPR_BELL_RIGHT]      = DEF_PNG(SHEET_BELL, 2),
 };
 
 #define MAX_SPRITE_PIXELS (64 * 64)
@@ -64,7 +105,10 @@ static SDL_Surface *load_png(const char *name)
     const char *base = SDL_GetBasePath();
     SDL_snprintf(path, sizeof path, "%s%s", base ? base : "", name);
     SDL_IOStream *io = SDL_IOFromFile(path, "rb");
-    if (!io) return NULL;
+    if (!io) {
+        SDL_Log("Planche absente : %s", path);
+        return NULL;
+    }
     SDL_Surface *raw = SDL_LoadPNG_IO(io, true);
     if (!raw) {
         SDL_Log("Planche illisible : %s (%s)", path, SDL_GetError());
@@ -118,16 +162,24 @@ static SDL_Rect cell_rect(SheetId s, int cell)
                        SHEETS[s].cell_w, SHEETS[s].cell_h };
 }
 
+int sprite_ama_head_above_body(void)
+{
+    /* Grilles : tête de 45 lignes dont la ligne 0 est 2 px au-dessus du crâne, corps à y = 37. */
+    return sheet_of(SPR_AMA_HEAD_FRONT) != SHEET_NONE ? SHEETS[SHEET_AMA_HEAD].cell_h - 8 : 39;
+}
+
 int sprite_width(SpriteId id)
 {
     SheetId s = sheet_of(id);
-    return s != SHEET_NONE ? SHEETS[s].cell_w : (int)SDL_strlen(DEFS[id].rows[0]);
+    if (s != SHEET_NONE || !DEFS[id].rows) return SHEETS[DEFS[id].sheet].cell_w;
+    return (int)SDL_strlen(DEFS[id].rows[0]);
 }
 
 int sprite_height(SpriteId id)
 {
     SheetId s = sheet_of(id);
-    return s != SHEET_NONE ? SHEETS[s].cell_h : DEFS[id].h;
+    if (s != SHEET_NONE || !DEFS[id].rows) return SHEETS[DEFS[id].sheet].cell_h;
+    return DEFS[id].h;
 }
 
 int sprite_bottom(SpriteId id)
@@ -145,6 +197,7 @@ int sprite_bottom(SpriteId id)
         return 0;
     }
     const SpriteDef *d = &DEFS[id];
+    if (!d->rows) return sprite_height(id) - 1;
     for (int y = d->h - 1; y >= 0; y--) {
         for (const char *c = d->rows[y]; *c; c++) {
             if (*c != '.') return y;
@@ -249,6 +302,7 @@ void sprite_draw(SDL_Renderer *r, SpriteId id, float x, float y, bool flip, bool
         SDL_RenderTextureRotated(r, sheet_tex[s][k], &src, &dst, 0.0, NULL, fm);
         return;
     }
+    if (!DEFS[id].rows) return;   /* planche absente et pas de grille de secours */
     if (!tex[id][k]) tex[id][k] = make_texture(r, id, white);
     if (!tex[id][k]) return;
     SDL_RenderTextureRotated(r, tex[id][k], NULL, &dst, 0.0, NULL, fm);

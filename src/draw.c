@@ -163,3 +163,20 @@ void draw_debug_text(SDL_Renderer *r, float x, float y, const char *utf8, float 
     SDL_RenderDebugText(r, x / scale, y / scale, buf);
     SDL_SetRenderScale(r, sx, sy);
 }
+
+void draw_crosshair(SDL_Renderer *r, float cx, float cy)
+{
+    /* Quatre traits roses (couleur des notes d'Amadeus) cernés de sombre, et un point au centre. */
+    SDL_Color dark = { 25, 18, 30, 255 }, pink = { 255, 70, 168, 255 };
+    cx = SDL_floorf(cx);
+    cy = SDL_floorf(cy);
+    for (int pass = 0; pass < 2; pass++) {
+        SDL_Color c = pass ? pink : dark;
+        float o = pass ? 0.0f : 1.0f;   /* le contour déborde d'un pixel */
+        draw_rect(r, cx - 8.0f - o, cy - 1.0f - o, 5.0f + 2.0f * o, 2.0f + 2.0f * o, c);
+        draw_rect(r, cx + 3.0f - o, cy - 1.0f - o, 5.0f + 2.0f * o, 2.0f + 2.0f * o, c);
+        draw_rect(r, cx - 1.0f - o, cy - 8.0f - o, 2.0f + 2.0f * o, 5.0f + 2.0f * o, c);
+        draw_rect(r, cx - 1.0f - o, cy + 3.0f - o, 2.0f + 2.0f * o, 5.0f + 2.0f * o, c);
+        draw_rect(r, cx - 1.0f - o, cy - 1.0f - o, 2.0f + 2.0f * o, 2.0f + 2.0f * o, c);
+    }
+}

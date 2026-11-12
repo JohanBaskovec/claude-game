@@ -19,6 +19,7 @@
 #define ROOM_MAX_CELLS 4
 #define ROOM_MAX_DOORS 8
 #define TREASURE_OFFERS 3   /* objets au choix dans la salle du trésor */
+#define ROOM_MAX_SPAWNS 16  /* ennemis d'une salle */
 
 typedef enum RoomShape {
     SHAPE_1x1,
@@ -54,7 +55,8 @@ typedef struct FloorRoom {
     int       door_count;
     FloorDoor doors[ROOM_MAX_DOORS];
     int       depth;          /* nombre de salles depuis le départ */
-    int       babies;         /* bébés à faire apparaître à la première visite */
+    int       spawn_count;    /* ennemis à faire apparaître à la première visite ... */
+    Uint8     spawns[ROOM_MAX_SPAWNS]; /* ... et leur type (EnemyType) */
     bool      visited;
     bool      cleared;        /* vidée de ses ennemis : portes ouvertes pour de bon */
     int       offers[TREASURE_OFFERS]; /* trésor et boss : objet sur chaque lutrin (ItemId), -1 si aucun.

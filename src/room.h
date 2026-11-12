@@ -89,6 +89,9 @@ const RoomDoor *room_find_door(const Room *room, int cx, int cy, Dir side);
 /* Point au hasard sur le sol, à `margin` px au moins des murs. */
 void room_random_floor_point(const Room *room, float margin, float *x, float *y);
 
+/* Ramène (x, y) sur le sol de la salle, à au moins (mx, my) des murs (cellule la plus proche). */
+void room_clamp_to_floor(const Room *room, float mx, float my, float *x, float *y);
+
 /* Centre de la première cellule. */
 void room_center(const Room *room, float *x, float *y);
 

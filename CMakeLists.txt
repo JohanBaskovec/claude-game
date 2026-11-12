@@ -40,6 +40,7 @@ endif()
 add_executable(fugue
     src/main.c
     src/bomb.c
+    src/bullet.c
     src/config.c
     src/debug_menu.c
     src/decor.c
@@ -57,6 +58,7 @@ add_executable(fugue
     src/player.c
     src/projectile.c
     src/room.c
+    src/splatter.c
     src/sprite.c
     src/text.c
     src/weapon.c

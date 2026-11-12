@@ -1,6 +1,8 @@
 #include "hazard.h"
 #include "draw.h"
 
+#include <math.h>
+
 #define RUBBLE_TIME  0.6f     /* les gravats restent un peu, s */
 #define DROP_HEIGHT  560.0f   /* la brique part d'au-dessus de l'écran, px */
 #define VISIBLE_FALL 0.30f    /* on ne voit la brique que pendant la fin de sa chute, s */
@@ -22,24 +24,44 @@ Hazard *hazard_spawn_brick(HazardPool *pool, float x, float y, float fall_time)
     return NULL;
 }
 
-Hazard *hazard_spawn_ink(HazardPool *pool, float x, float y)
+static Hazard *spawn_puddle(HazardPool *pool, HazardType type, float x, float y)
 {
     for (int i = 0; i < MAX_HAZARDS; i++) {
         Hazard *h = &pool->items[i];
         if (!h->active) {
-            *h = (Hazard){ .active = true, .type = HAZARD_INK, .landed = true, .x = x, .y = y };
+            *h = (Hazard){ .active = true, .type = type, .landed = true, .x = x, .y = y };
             return h;
         }
     }
     return NULL;
 }
 
-bool hazard_in_ink(const HazardPool *pool, float x, float y)
+Hazard *hazard_spawn_ink(HazardPool *pool, float x, float y)
 {
-    float r = tuning.ink_radius;
+    return spawn_puddle(pool, HAZARD_INK, x, y);
+}
+
+Hazard *hazard_spawn_toxic(HazardPool *pool, float x, float y)
+{
+    return spawn_puddle(pool, HAZARD_TOXIC, x, y);
+}
+
+static float puddle_radius(HazardType type)
+{
+    return type == HAZARD_TOXIC ? tuning.toxic_radius : tuning.ink_radius;
+}
+
+static float puddle_time(HazardType type)
+{
+    return type == HAZARD_TOXIC ? tuning.toxic_time : tuning.ink_time;
+}
+
+bool hazard_in(const HazardPool *pool, HazardType type, float x, float y)
+{
+    float r = puddle_radius(type);
     for (int i = 0; i < MAX_HAZARDS; i++) {
         const Hazard *h = &pool->items[i];
-        if (!h->active || h->type != HAZARD_INK) continue;
+        if (!h->active || h->type != type) continue;
         /* Flaque vue en perspective : ellipse deux fois plus large que haute. */
         float dx = (x - h->x) / r, dy = (y - h->y) / (r * 0.5f);
         if (dx * dx + dy * dy <= 1.0f) return true;
@@ -51,8 +73,8 @@ bool hazard_update(Hazard *h, float dt)
 {
     if (!h->active) return false;
     h->timer += dt;
-    if (h->type == HAZARD_INK) {
-        if (h->timer >= tuning.ink_time) h->active = false;
+    if (h->type != HAZARD_BRICK) {
+        if (h->timer >= puddle_time(h->type)) h->active = false;
         return false;
     }
     if (h->landed) {
@@ -85,6 +107,23 @@ void hazard_render_ground(const Hazard *h, SDL_Renderer *r, Camera cam)
         float ir = tuning.ink_radius * (0.6f + 0.4f * SDL_min(h->timer / 0.1f, 1.0f));
         draw_ellipse(r, x, y, ir, ir * 0.5f, (SDL_Color){ 26, 30, 64, (Uint8)(200.0f * u) });
         draw_ellipse(r, x - ir * 0.3f, y - ir * 0.1f, ir * 0.25f, ir * 0.1f, (SDL_Color){ 90, 100, 150, (Uint8)(120.0f * u) });
+        return;
+    }
+    if (h->type == HAZARD_TOXIC) {
+        /* Encre verdâtre qui bouillonne : des bulles naissent et éclatent. */
+        float T = tuning.toxic_time;
+        float u = SDL_min(h->timer / 0.12f, 1.0f) * SDL_clamp((T - h->timer) / 0.6f, 0.0f, 1.0f);
+        float ir = tuning.toxic_radius * (0.5f + 0.5f * SDL_min(h->timer / 0.12f, 1.0f));
+        draw_ellipse(r, x, y, ir + 2.0f, ir * 0.5f + 1.0f, (SDL_Color){ 14, 22, 14, (Uint8)(210.0f * u) });
+        draw_ellipse(r, x, y, ir, ir * 0.5f, (SDL_Color){ 36, 62, 34, (Uint8)(220.0f * u) });
+        draw_ellipse(r, x - ir * 0.35f, y - ir * 0.12f, ir * 0.3f, ir * 0.1f, (SDL_Color){ 96, 140, 70, (Uint8)(150.0f * u) });
+        for (int k = 0; k < 4; k++) {
+            float ph = SDL_fmodf(h->timer * 1.3f + (float)k * 0.37f, 1.0f);   /* cycle de vie d'une bulle */
+            float bx = x + sinf((float)k * 2.4f + h->x) * ir * 0.6f;
+            float by = y + cosf((float)k * 1.7f + h->y) * ir * 0.25f;
+            float br = 1.0f + 3.0f * ph;
+            draw_ellipse(r, bx, by - br * 0.5f, br, br * 0.8f, (SDL_Color){ 130, 180, 90, (Uint8)(200.0f * u * (1.0f - ph * ph)) });
+        }
         return;
     }
     float rad = tuning.brick_radius;
