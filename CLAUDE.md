@@ -40,9 +40,11 @@ Web : `emcmake cmake -S . -B build-web` (Emscripten non installé pour l'instant
 - Graines : `floor_generate` mélange la graine (splitmix64) car le générateur de SDL donne des premiers tirages identiques pour les petites graines. Tout aléatoire de génération passe par `SDL_rand_r` sur cet état, pour que même graine = même étage.
 - Attributs du joueur (PV, PV max, vitesse, cadence, dégâts, vitesse et portée des tirs) : `tuning.start_*` = valeurs de départ, `player.stats` (`PlayerStats`) = valeurs courantes. Le gameplay lit toujours `player.stats`. Un nouvel attribut s'ajoute aussi au tableau `ROWS` de `debug_menu.c`.
 - Outils de debug : F1 (infos), F2 (menu des attributs et actions comme « Ajouter un bébé », `debug_menu.c` ; une action renvoie un `DebugAction` que `main.c` exécute). La police de debug SDL est en ASCII : pas d'accents dans ces textes.
-- Un module par entité (`player`, `enemy`, `projectile`, `room`, `floor`, `hud`, `minimap`, `input`, `debug_menu`), chacun avec `_init`, `_update`, `_render`.
+- Un module par entité (`player`, `enemy` (bébé et boss), `projectile`, `pickup` (prix), `bomb` (métronome), `hazard` (briques), `item` (objets du trésor), `room`, `floor`, `hud`, `minimap`, `input`, `debug_menu`), chacun avec `_init`, `_update`, `_render`.
+- `draw.c` : petites primitives de dessin partagées (rectangle, ellipse, trait, icônes métronome/couronne, chiffres pixel, texte avec la police de debug en retirant les accents).
+- Rendu d'une salle en couches (`game.c`) : sol et trappe → ombres au sol → tout ce qui est trié par la position des pieds (joueur, ennemis, lutrins, métronomes, prix) → ce qui est en l'air (briques qui tombent, notes, explosions). Un nouvel objet posé au sol s'ajoute à la liste triée.
 - Piège : `DIR_NONE` vaut -1, donc un `Input` initialisé à zéro signifie « tirer vers le haut ». Toujours écrire `{ 0, 0, DIR_NONE }`.
 - Comparaisons de minuteries flottantes (cadence, invincibilité) : utiliser une petite tolérance (`1e-4f`), sinon un arrondi décale d'une image.
 - Coordonnées en pixels du jeu (960×540), temps en secondes, vitesses en px/s.
-- Commentaires et textes en français. Le jeu sera bilingue FR/EN : pas de texte affiché en dur dans le code une fois qu'il y aura du texte.
+- Commentaires en français. Le jeu est bilingue FR/EN : **tout texte affiché au joueur passe par `text.c`** (`TextId` + `text_get`), avec ses deux versions. Seuls les outils de debug (F1, F2) ne sont pas traduits. La langue suit les préférences du système (`text_init_from_locale`).
 - Compiler sans avertissement (`-Wall -Wextra -Wpedantic -Wshadow`).

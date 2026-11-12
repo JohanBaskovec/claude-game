@@ -1,5 +1,6 @@
 #include "hud.h"
 #include "config.h"
+#include "draw.h"
 
 #include <math.h>
 
@@ -9,13 +10,28 @@
 #define BAR_OPEN_H  28.0f   /* ouverture du soufflet, côté droit */
 #define BAR_LINE_W  3.0f    /* épaisseur des deux traits */
 
+/* Compteurs sous la barre de vie. */
+#define COUNT_X     36.0f
+#define COUNT_Y     76.0f
+#define COUNT_STEP  22.0f
+
 void hud_init(Hud *hud, const PlayerStats *stats)
 {
     hud->shown_hp = (float)stats->hp;
+    hud->banner_title = hud->banner_text = NULL;
+    hud->banner_timer = 0.0f;
+}
+
+void hud_show_banner(Hud *hud, const char *title, const char *text)
+{
+    hud->banner_title = title;
+    hud->banner_text = text;
+    hud->banner_timer = tuning.item_banner_time;
 }
 
 void hud_update(Hud *hud, const PlayerStats *stats, float dt)
 {
+    if (hud->banner_timer > 0.0f) hud->banner_timer -= dt;
     float hp = (float)stats->hp;
     if (hud->shown_hp <= hp) {
         hud->shown_hp = hp;   /* un soin s'affiche tout de suite */
@@ -81,4 +97,36 @@ void hud_render(const Hud *hud, SDL_Renderer *r, const PlayerStats *stats)
     float end = BAR_X + len;
     thick_line(r, BAR_X, BAR_CY, end, BAR_CY - BAR_OPEN_H * 0.5f, BAR_LINE_W, line);
     thick_line(r, BAR_X, BAR_CY, end, BAR_CY + BAR_OPEN_H * 0.5f, BAR_LINE_W, line);
+
+    /* Royalties (couronne) puis métronomes, comme pièces et bombes dans TBOI. */
+    SDL_Color text = { 236, 226, 204, 255 };
+    draw_crown(r, COUNT_X, COUNT_Y, 1.0f);
+    draw_number(r, COUNT_X + 14.0f, COUNT_Y - 5.0f, stats->coins, 2, 2.0f, text);
+    draw_metronome(r, COUNT_X, COUNT_Y + COUNT_STEP, 1.0f, 0.35f);
+    draw_number(r, COUNT_X + 14.0f, COUNT_Y + COUNT_STEP - 5.0f, stats->bombs, 2, 2.0f, text);
+
+    /* Bandeau de l'objet ramassé, qui s'efface à la fin. */
+    if (hud->banner_timer > 0.0f && hud->banner_title) {
+        float a = SDL_clamp(hud->banner_timer / 0.4f, 0.0f, 1.0f);
+        float y = 150.0f;
+        draw_rect(r, 0, y - 10, GAME_W, 58, (SDL_Color){ 14, 10, 10, (Uint8)(190 * a) });
+        float tw = draw_debug_text_width(hud->banner_title, 3.0f);
+        draw_debug_text(r, SDL_floorf((GAME_W - tw) * 0.5f), y, hud->banner_title, 3.0f,
+                        (SDL_Color){ 255, 220, 120, (Uint8)(255 * a) });
+        if (hud->banner_text) {
+            float dw = draw_debug_text_width(hud->banner_text, 1.0f);
+            draw_debug_text(r, SDL_floorf((GAME_W - dw) * 0.5f), y + 32, hud->banner_text, 1.0f,
+                            (SDL_Color){ 236, 226, 204, (Uint8)(255 * a) });
+        }
+    }
+}
+
+void hud_render_boss(SDL_Renderer *r, float hp, float max_hp)
+{
+    const float w = 360.0f, h = 12.0f, x = (GAME_W - w) * 0.5f, y = GAME_H - 34.0f;
+    float f = SDL_clamp(hp / SDL_max(max_hp, 1.0f), 0.0f, 1.0f);
+    draw_rect(r, x - 3, y - 3, w + 6, h + 6, (SDL_Color){ 236, 226, 204, 255 });
+    draw_rect(r, x, y, w, h, (SDL_Color){ 18, 14, 12, 255 });
+    draw_rect(r, x, y, w * f, h, (SDL_Color){ 204, 52, 44, 255 });
+    draw_rect(r, x, y, w * f, 3, (SDL_Color){ 236, 110, 90, 255 });
 }

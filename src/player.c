@@ -13,6 +13,8 @@ PlayerStats player_start_stats(void)
         .damage     = tuning.start_damage,
         .shot_speed = tuning.start_shot_speed,
         .shot_range = tuning.start_shot_range,
+        .bombs      = tuning.start_bombs,
+        .coins      = tuning.start_coins,
     };
 }
 

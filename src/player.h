@@ -15,6 +15,8 @@ typedef struct PlayerStats {
     float damage;       /* dégâts de chaque note, PV ennemis */
     float shot_speed;   /* vitesse des tirs, px/s */
     float shot_range;   /* portée des tirs, px */
+    int   bombs;        /* métronomes */
+    int   coins;        /* royalties */
 } PlayerStats;
 
 typedef struct Player {

@@ -18,6 +18,7 @@
 #define FLOOR_MAX_ROOMS 32
 #define ROOM_MAX_CELLS 4
 #define ROOM_MAX_DOORS 8
+#define TREASURE_OFFERS 3   /* objets au choix dans la salle du trésor */
 
 typedef enum RoomShape {
     SHAPE_1x1,
@@ -35,6 +36,7 @@ typedef enum RoomKind {
     ROOM_NORMAL,
     ROOM_START,
     ROOM_BOSS,
+    ROOM_TREASURE,
 } RoomKind;
 
 /* Porte : sur le côté `side` de la cellule (cell_x, cell_y), vers la salle `target`. */
@@ -55,6 +57,8 @@ typedef struct FloorRoom {
     int       babies;         /* bébés à faire apparaître à la première visite */
     bool      visited;
     bool      cleared;        /* vidée de ses ennemis : portes ouvertes pour de bon */
+    int       offers[TREASURE_OFFERS]; /* salle du trésor : objet sur chaque lutrin (ItemId), -1 si aucun.
+                                          Rempli par le jeu, qui sait quels objets sont déjà pris. */
 } FloorRoom;
 
 typedef struct Floor {
@@ -64,6 +68,7 @@ typedef struct Floor {
     FloorRoom rooms[FLOOR_MAX_ROOMS];
     int       start;
     int       boss;
+    int       treasure;       /* -1 si aucune */
 } Floor;
 
 /* Génère un étage. Même graine = même étage. */

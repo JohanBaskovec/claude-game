@@ -17,6 +17,7 @@ typedef enum Dir {
 typedef struct Input {
     float move_x, move_y;   /* direction de déplacement, normalisée (ou 0,0) */
     Dir   shoot;            /* direction de tir, DIR_NONE si aucune flèche */
+    bool  bomb;             /* poser un métronome (vrai pendant un seul pas après l'appui) */
 } Input;
 
 /* À appeler pour chaque événement SDL (suit l'ordre d'appui des flèches). */

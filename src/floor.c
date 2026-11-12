@@ -92,6 +92,7 @@ static int try_place(Floor *f, RoomShape shape, int ox, int oy, int parent)
     room->shape = shape;
     room->kind = ROOM_NORMAL;
     room->cell_count = n;
+    for (int i = 0; i < TREASURE_OFFERS; i++) room->offers[i] = -1;
     for (int i = 0; i < n; i++) {
         room->cell_x[i] = ox + SHAPE_CELLS[shape][i][0];
         room->cell_y[i] = oy + SHAPE_CELLS[shape][i][1];
@@ -163,6 +164,7 @@ static int distinct_neighbours(const FloorRoom *room)
 static bool attempt(Floor *f, Uint64 *rng)
 {
     clear(f);
+    f->boss = f->treasure = -1;
     int target = tuning.floor_min_rooms + SDL_rand_r(rng, tuning.floor_max_rooms - tuning.floor_min_rooms + 1);
 
     f->start = try_place(f, SHAPE_1x1, FLOOR_START_X, FLOOR_START_Y, -1);
@@ -208,6 +210,15 @@ static bool attempt(Floor *f, Uint64 *rng)
     }
     if (f->boss < 0) return false;
 
+    /* Salle du trésor : un autre cul-de-sac, d'une seule cellule, tiré au hasard. */
+    int candidates[FLOOR_MAX_ROOMS], nc = 0;
+    for (int r = 0; r < f->room_count; r++) {
+        if (r == f->start || r == f->boss || f->rooms[r].cell_count != 1) continue;
+        if (distinct_neighbours(&f->rooms[r]) == 1) candidates[nc++] = r;
+    }
+    if (nc == 0) return false;
+    f->treasure = candidates[SDL_rand_r(rng, nc)];
+
     for (int r = 0; r < f->room_count; r++) {
         FloorRoom *room = &f->rooms[r];
         if (r == f->start) {
@@ -216,6 +227,9 @@ static bool attempt(Floor *f, Uint64 *rng)
         } else if (r == f->boss) {
             room->kind = ROOM_BOSS;
             room->babies = tuning.boss_room_babies;
+        } else if (r == f->treasure) {
+            room->kind = ROOM_TREASURE;
+            room->babies = 0;
         } else {
             room->babies = SDL_rand_r(rng, tuning.room_max_babies + 1)
                          + tuning.room_babies_per_extra_cell * (room->cell_count - 1);

@@ -76,6 +76,11 @@ void minimap_render(const Floor *floor, int current, SDL_Renderer *r, bool revea
             float bx = MM_X + room->cell_x[0] * MM_CELL_W + MM_CELL_W * 0.5f - 2.0f;
             float by = MM_Y + room->cell_y[0] * MM_CELL_H + MM_CELL_H * 0.5f - 2.0f;
             fill(r, bx, by, 5.0f, 4.0f, 190, 30, 30, 255);
+        } else if (room->kind == ROOM_TREASURE) {
+            /* Marque du trésor : un carré doré. */
+            float tx = MM_X + room->cell_x[0] * MM_CELL_W + MM_CELL_W * 0.5f - 2.0f;
+            float ty = MM_Y + room->cell_y[0] * MM_CELL_H + MM_CELL_H * 0.5f - 2.0f;
+            fill(r, tx, ty, 5.0f, 4.0f, 236, 190, 52, 255);
         }
     }
 

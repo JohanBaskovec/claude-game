@@ -3,11 +3,15 @@
 
 #include <SDL3/SDL.h>
 
+#include "bomb.h"
 #include "camera.h"
 #include "enemy.h"
 #include "floor.h"
+#include "hazard.h"
 #include "hud.h"
 #include "input.h"
+#include "item.h"
+#include "pickup.h"
 #include "player.h"
 #include "projectile.h"
 #include "room.h"
@@ -28,21 +32,33 @@ typedef struct Game {
     Player         player;
     ProjectilePool shots;
     EnemyPool      enemies;
+    PickupPool     pickups;
+    BombPool       bombs;
+    HazardPool     hazards;
     Hud            hud;
     Transition     transition;
     int            deaths;     /* compteur, pour le debug */
+
+    /* La partie en cours (remise à zéro à la mort) */
+    int            floor_number;          /* 1 = premier étage */
+    bool           owned[ITEM_COUNT];     /* objets pris pendant la partie */
+    bool           trapdoor_armed;        /* la trappe ne marche qu'après en être sorti une fois */
+    float          shake_timer;           /* tremblement de l'écran, s */
+    float          time;                  /* s de jeu, pour les animations */
 
     /* Affichage de la mini-carte, réglé par la fenêtre (souris, menu de debug). */
     bool           reveal_map; /* toute la carte visible et téléportation partout (debug) */
     int            map_hover;  /* salle survolée sur la mini-carte, -1 si aucune */
 } Game;
 
-/* Nouvelle partie sur un étage généré avec cette graine. */
+/* Initialise le jeu et commence une partie. */
 void game_init(Game *g, Uint64 seed);
 
-/* Nouvel étage (mort provisoire, bouton de debug) : le joueur garde ses attributs
- * mais retrouve tous ses PV. */
-void game_new_floor(Game *g, Uint64 seed);
+/* Nouvelle partie (à la mort) : étage 1, attributs de départ, aucun objet. */
+void game_new_run(Game *g, Uint64 seed);
+
+/* Étage suivant (trappe, bouton de debug) : on garde tout, PV compris. */
+void game_next_floor(Game *g, Uint64 seed);
 
 /* Un pas de logique à durée fixe. */
 void game_step(Game *g, const Input *in, float dt);

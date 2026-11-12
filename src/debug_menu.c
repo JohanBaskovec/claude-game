@@ -32,6 +32,8 @@ static const StatRow ROWS[] = {
     { "Degats",           "PV",      STAT_FLOAT, offsetof(PlayerStats, damage),     0.5f,  0.5f,  50.0f,   1 },
     { "Vitesse des tirs", "px/s",    STAT_FLOAT, offsetof(PlayerStats, shot_speed), 20.0f, 60.0f, 2000.0f, 0 },
     { "Portee des tirs",  "px",      STAT_FLOAT, offsetof(PlayerStats, shot_range), 20.0f, 20.0f, 2000.0f, 0 },
+    { "Metronomes",       "",        STAT_INT,   offsetof(PlayerStats, bombs),      1.0f,  0.0f,  99.0f,   0 },
+    { "Royalties",        "",        STAT_INT,   offsetof(PlayerStats, coins),      1.0f,  0.0f,  99.0f,   0 },
 };
 #define ROW_COUNT ((int)(sizeof(ROWS) / sizeof(ROWS[0])))
 
@@ -65,7 +67,7 @@ static const StatRow ROWS[] = {
 
 static const char *RESET_LABEL = "Valeurs de depart";
 static const char *BABY_LABEL  = "Ajouter un bebe";
-static const char *FLOOR_LABEL = "Nouvel etage";
+static const char *FLOOR_LABEL = "Etage suivant";
 static const char *KILL_LABEL  = "Tuer les ennemis";
 
 static SDL_FRect button_rect(int id)
@@ -272,7 +274,8 @@ void debug_menu_render(const DebugMenu *m, SDL_Renderer *r, const PlayerStats *s
         draw_text(r, PANEL_X + 10.0f, y, row->label, 200);
 
         char value[32];
-        SDL_snprintf(value, sizeof value, "%.*f %s", row->decimals, (double)get_value(row, stats), row->unit);
+        SDL_snprintf(value, sizeof value, "%.*f%s%s", row->decimals, (double)get_value(row, stats),
+                     row->unit[0] ? " " : "", row->unit);
         draw_text(r, VALUE_END - (float)strlen(value) * GLYPH, y, value, 255);
 
         draw_button(r, m, i * 2,     "-", button_enabled(i * 2, stats));

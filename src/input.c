@@ -10,6 +10,7 @@
 /* Numéro d'ordre du dernier appui sur chaque flèche (0 = relâchée). */
 static Uint64 arrow_order[DIR_COUNT];
 static Uint64 press_counter;
+static bool   bomb_pressed;   /* appui sur E pas encore consommé */
 
 static Dir arrow_from_scancode(SDL_Scancode sc)
 {
@@ -29,6 +30,9 @@ void input_handle_event(const SDL_Event *event)
         Dir d = arrow_from_scancode(event->key.scancode);
         if (d != DIR_NONE && !event->key.repeat) {
             arrow_order[d] = ++press_counter;
+        }
+        if (event->key.scancode == SDL_SCANCODE_E && !event->key.repeat) {
+            bomb_pressed = true;
         }
         break;
     }
@@ -52,7 +56,8 @@ void input_handle_event(const SDL_Event *event)
 Input input_sample(void)
 {
     const bool *keys = SDL_GetKeyboardState(NULL);
-    Input in = { 0.0f, 0.0f, DIR_NONE };
+    Input in = { 0.0f, 0.0f, DIR_NONE, bomb_pressed };
+    bomb_pressed = false;
 
     if (keys[SDL_SCANCODE_W]) in.move_y -= 1.0f;
     if (keys[SDL_SCANCODE_S]) in.move_y += 1.0f;

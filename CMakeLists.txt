@@ -39,17 +39,23 @@ endif()
 # --- Jeu ----------------------------------------------------------------
 add_executable(fugue
     src/main.c
+    src/bomb.c
     src/config.c
     src/debug_menu.c
+    src/draw.c
     src/enemy.c
     src/floor.c
     src/game.c
+    src/hazard.c
     src/hud.c
     src/input.c
+    src/item.c
     src/minimap.c
+    src/pickup.c
     src/player.c
     src/projectile.c
     src/room.c
+    src/text.c
 )
 
 target_link_libraries(fugue PRIVATE SDL3::SDL3)

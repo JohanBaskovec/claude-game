@@ -22,6 +22,10 @@
 #define DOOR_H       64.0f    /* ouverture des portes de gauche et de droite */
 
 #define ROOM_MAX_WALLS (ROOM_MAX_CELLS * 4 * 2)
+#define ROOM_MAX_PROPS TREASURE_OFFERS
+#define LUTRIN_W     52.0f    /* pied du lutrin (obstacle) */
+#define LUTRIN_H     22.0f
+#define LUTRIN_GAP   176.0f   /* écart entre deux lutrins */
 
 typedef struct RoomDoor {
     Dir       side;
@@ -42,11 +46,15 @@ typedef struct Room {
     int       door_count;
     RoomDoor  doors[ROOM_MAX_DOORS];
     bool      doors_open;
+    int       prop_count;      /* lutrins de la salle du trésor : obstacles */
+    SDL_FRect props[ROOM_MAX_PROPS];
+    bool      trapdoor;        /* trappe vers l'étage suivant (salle du boss vaincu) */
+    float     trapdoor_x, trapdoor_y;
 } Room;
 
 void room_build(Room *room, const Floor *floor, int index);
 
-/* Vrai si le rectangle chevauche un mur ou une porte fermée. */
+/* Vrai si le rectangle chevauche un mur, un lutrin ou une porte fermée. */
 bool room_overlaps_wall(const Room *room, const SDL_FRect *r);
 
 /*
@@ -73,9 +81,19 @@ void room_random_floor_point(const Room *room, float margin, float *x, float *y)
 /* Centre de la première cellule. */
 void room_center(const Room *room, float *x, float *y);
 
+/* Centre de la cellule la plus centrale (prix, trappe, boss). */
+void room_middle(const Room *room, float *x, float *y);
+
+/* Fait apparaître la trappe au milieu de la salle. */
+void room_open_trapdoor(Room *room);
+
 /* Caméra qui suit le point (x, y), bornée aux murs de la salle. */
 Camera room_camera(const Room *room, float x, float y);
 
+/* Sol, murs, portes et trappe. */
 void room_render(const Room *room, SDL_Renderer *renderer, Camera cam);
+
+/* Un lutrin, trié par profondeur avec les personnages (bas = props[i].y + h). */
+void room_render_lutrin(const Room *room, int i, SDL_Renderer *renderer, Camera cam);
 
 #endif

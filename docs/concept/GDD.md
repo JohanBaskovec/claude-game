@@ -3,7 +3,7 @@
 > Document de travail destiné à Claude Code. Il décrit l'univers et les choix de design.
 > **Statut : en cours de conception.** Les sections marquées ✅ sont décidées, 💡 sont des idées à valider, ❓ sont des questions ouvertes.
 > **Source de vérité du design : ce fichier, dans le dépôt** (`docs/concept/GDD.md`). La conception se fait désormais uniquement avec Claude Code, qui le met à jour au fil des décisions prises avec Johan.
-> **Phase en cours : Phase 3 (section 12).** Les Phases 1 et 2 (sections 10 et 11) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
+> **Phase en cours : Phase 4 (section 13).** Les Phases 1 à 3 (sections 10 à 12) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
 
 ---
 
@@ -346,7 +346,7 @@ Autres ennemis, objets, salles multiples, écran de mort, sons, graphismes finau
 
 ---
 
-## 12. PHASE 3 — Un étage (en cours)
+## 12. PHASE 3 — Un étage ✅ (terminée)
 
 **But** : parcourir un étage généré au hasard, de salle en salle, y compris dans de grandes salles plus larges que l'écran.
 
@@ -384,8 +384,8 @@ Autres ennemis, objets, salles multiples, écran de mort, sons, graphismes finau
 - Salles **visitées** éclairées, salle **actuelle** en rose, salles **découvertes** (voisines d'une salle visitée) en sombre, les autres invisibles. La salle du boss est marquée dès qu'elle est découverte.
 - ✅ **Téléportation** : un clic sur une salle **déjà visitée** de la mini-carte y téléporte le joueur, au centre de la cellule cliquée. **Interdit pendant un combat** (tant qu'il reste des ennemis dans la salle), sinon on pourrait fuir n'importe quel combat. La salle survolée par la souris est entourée de blanc si on peut s'y téléporter.
 
-### Mort ✅
-- À 0 PV, on recommence sur un **nouvel étage** (nouvelle graine). Les attributs réglés dans le menu de debug sont conservés.
+### Mort
+- Remplacé en Phase 4 : à 0 PV, la partie recommence de zéro (section 13).
 
 ### Debug
 - **F1** affiche la graine et la salle actuelle.
@@ -393,4 +393,74 @@ Autres ennemis, objets, salles multiples, écran de mort, sons, graphismes finau
 
 ### Hors périmètre (ne pas faire)
 Sol en double page (texte latin, reliure), portes à serrure, salles spéciales autres que le boss, vrai boss, passage à l'étage suivant, objets, sons, graphismes finaux.
+
+---
+
+## 13. PHASE 4 — Une vraie partie (en cours)
+
+**But** : une partie complète façon roguelike : explorer, ramasser des prix, choisir un objet, battre le boss, descendre à l'étage suivant, mourir, recommencer.
+
+### Prix de fin de salle ✅
+- Comme dans TBOI : quand on **vide une salle** de ses ennemis, un prix peut apparaître **au centre de la salle** (au centre de la cellule la plus centrale pour une grande salle).
+- Le prix apparaît, puis est **aspiré** : après un court instant (≈ 0,4 s), il vole vers le joueur en accélérant et se ramasse tout seul au contact.
+- Prix possibles pour l'instant : **métronome** et **royalties**. Chance d'un prix : 70 %, puis 50/50 entre les deux (provisoire).
+- Les salles sans ennemis (départ, trésor) ne donnent pas de prix.
+
+### Métronome = bombe ✅
+- On en a **1 au départ**. Touche **E** (même position en AZERTY et QWERTY) pour en poser un à ses pieds.
+- Il fait **tic-tac en accélérant** (le balancier oscille de plus en plus vite) pendant ≈ 1,5 s, puis **explose**.
+- Explosion : rayon ≈ 100 px, **10 dégâts** aux ennemis (le bébé meurt, le boss encaisse), **2 PV** au joueur s'il est dedans (provisoire). Les ennemis sont repoussés.
+
+### Royalties ✅
+- L'argent du jeu, symbole **couronne**. Pas encore d'usage : la boutique (Luthier) viendra plus tard.
+
+### Interface ✅
+- Sous la barre de vie : icône de métronome et icône de couronne, avec leur nombre.
+
+### Salle du trésor ✅
+- Un **cul-de-sac 1×1** (jamais le départ ni le boss), sans ennemis. Marque dorée sur la mini-carte.
+- **Différence avec TBOI : 3 objets au choix**, chacun posé sur un **lutrin** (meuble des livres de chœur, placeholder du socle). On en ramasse un en marchant dessus ; **les deux autres disparaissent**.
+- Les lutrins sont des obstacles : on ne les traverse pas, les notes s'y arrêtent.
+- En ramassant un objet, son nom et son effet s'affichent quelques secondes.
+- Un objet déjà pris dans la partie ne réapparaît pas.
+
+### Objets (provisoires, à discuter) 💡
+Cinq objets pour tester la salle du trésor. Les noms viennent des anecdotes de la section 6.
+
+| Objet | Effet provisoire |
+|---|---|
+| Bâton de Lully | Dégâts +1, mais une note sur 20 frappe le pied du joueur (1 PV). |
+| Crâne de Haydn | PV maximum +2, et soigne 2 PV. |
+| Vexations (Satie) | Cadence de tir +1,5. |
+| Main guidonienne | Vitesse des tirs +120, portée +80. |
+| Sabots de Strasbourg | Vitesse de déplacement +40 (l'épidémie de danse de 1518). |
+
+### Boss du premier étage : le Gros Bébé ✅
+- Un **gros bébé médiéval tout moche**, version géante du bébé. **40 PV** (provisoire). Contact : 1 PV.
+- Il **se déplace au hasard** : il choisit un point, y marche lentement, s'arrête, recommence.
+- **Saut** toutes les 4 à 7 s : il s'accroupit (≈ 0,4 s), saute hors de l'écran, puis **retombe à un endroit au hasard** (≈ 1,2 s en l'air). Pendant le saut, il est intouchable, et **son ombre grandit à l'endroit où il va tomber**.
+- À l'atterrissage : dégâts s'il tombe sur le joueur, l'écran tremble, et **8 briques tombent du plafond** à des endroits au hasard. **Chaque brique est annoncée par une ombre** qui grandit pendant ≈ 1 s. Une brique fait 1 PV.
+- **Barre de vie du boss** en bas de l'écran.
+
+### Trappe vers l'étage suivant ✅
+- À la mort du boss, une **trappe** apparaît au centre de la salle. Marcher dessus mène à l'**étage suivant** (nouvelle graine).
+- On garde tout : PV, attributs, objets, métronomes, royalties.
+- Pour l'instant, tous les étages sont du Haut Moyen Âge (même boss, même bébé).
+
+### Mort ✅
+- À 0 PV, **la partie recommence de zéro** : étage 1, attributs de départ, aucun objet, 1 métronome, 0 royalties.
+
+### Debug
+- **F2** : lignes « Métronomes » et « Royalties » ; le bouton « Nouvel étage » devient « Étage suivant » (comme la trappe). **F1** : numéro d'étage et objets pris.
+
+### Précisions de la mise en œuvre ✅
+- Un prix encore en vol quand on quitte la salle est donné au joueur (pas perdu).
+- Le Bâton de Lully : la note qui frappe le pied ne part pas.
+- La salle du boss ne contient que le boss (plus de bébés autour).
+- La trappe ne marche qu'après en être sorti une fois (on peut apparaître dessus en se téléportant).
+- Téléporté au centre de la salle du trésor : on arrive sous les lutrins, sans prendre d'objet.
+- Les noms et effets des objets existent en français et en anglais ; la langue suit celle du système.
+
+### Hors périmètre (ne pas faire)
+Écran de mort, boutique, clés et portes à serrure, autres prix (cœurs, clés, partitions…), apparence d'Amadeus modifiée par les objets, boss différents selon l'étage, sons, graphismes finaux.
 

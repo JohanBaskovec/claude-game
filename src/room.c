@@ -1,5 +1,6 @@
 #include "room.h"
 #include "config.h"
+#include "draw.h"
 
 /* Distance à laquelle le joueur arrive devant la porte, depuis le bord du sol. */
 #define ENTRY_INSET   40.0f
@@ -118,12 +119,56 @@ void room_build(Room *room, const Floor *floor, int index)
             build_side(room, room->cells[i], (Dir)s, door);
         }
     }
+
+    /* Salle du trésor : trois lutrins alignés au milieu de la salle. */
+    if (fr->kind == ROOM_TREASURE) {
+        float mx, my;
+        room_middle(room, &mx, &my);
+        for (int i = 0; i < ROOM_MAX_PROPS; i++) {
+            float x = mx + ((float)i - (ROOM_MAX_PROPS - 1) * 0.5f) * LUTRIN_GAP;
+            room->props[room->prop_count++] = (SDL_FRect){ x - LUTRIN_W * 0.5f, my - LUTRIN_H * 0.5f, LUTRIN_W, LUTRIN_H };
+        }
+    }
+    /* Salle du boss déjà vaincu : la trappe est toujours là. */
+    if (fr->kind == ROOM_BOSS && fr->cleared) {
+        room_open_trapdoor(room);
+    }
+}
+
+void room_middle(const Room *room, float *x, float *y)
+{
+    float sx = 0.0f, sy = 0.0f;
+    for (int i = 0; i < room->cell_count; i++) {
+        sx += room->cells[i].x + room->cells[i].w * 0.5f;
+        sy += room->cells[i].y + room->cells[i].h * 0.5f;
+    }
+    sx /= (float)room->cell_count;
+    sy /= (float)room->cell_count;
+    float best = 1e18f;
+    for (int i = 0; i < room->cell_count; i++) {
+        float cx = room->cells[i].x + room->cells[i].w * 0.5f, cy = room->cells[i].y + room->cells[i].h * 0.5f;
+        float d = (cx - sx) * (cx - sx) + (cy - sy) * (cy - sy);
+        if (d < best) {
+            best = d;
+            *x = cx;
+            *y = cy;
+        }
+    }
+}
+
+void room_open_trapdoor(Room *room)
+{
+    room->trapdoor = true;
+    room_middle(room, &room->trapdoor_x, &room->trapdoor_y);
 }
 
 bool room_overlaps_wall(const Room *room, const SDL_FRect *r)
 {
     for (int i = 0; i < room->wall_count; i++) {
         if (overlaps(r, &room->walls[i])) return true;
+    }
+    for (int i = 0; i < room->prop_count; i++) {
+        if (overlaps(r, &room->props[i])) return true;
     }
     if (!room->doors_open) {
         for (int i = 0; i < room->door_count; i++) {
@@ -150,6 +195,9 @@ static int collide_axis(const Room *room, SDL_FRect *box, float dx, float dy)
     int blocked = 0;
     for (int i = 0; i < room->wall_count; i++) {
         blocked |= push_out(box, &room->walls[i], dx, dy);
+    }
+    for (int i = 0; i < room->prop_count; i++) {
+        blocked |= push_out(box, &room->props[i], dx, dy);
     }
     if (!room->doors_open) {
         for (int i = 0; i < room->door_count; i++) {
@@ -289,5 +337,44 @@ void room_render(const Room *room, SDL_Renderer *r, Camera cam)
         for (int k = 0; k < 6; k++) {
             fill(r, cam, (SDL_FRect){ c.x, c.y + 46.0f + 60.0f * (float)k, c.w, 2.0f }, 184, 171, 146);
         }
+    }
+
+    if (room->trapdoor) {
+        /* Trappe : cadre de bois et trou noir. */
+        float x = room->trapdoor_x - cam.x, y = room->trapdoor_y - cam.y;
+        draw_rect(r, x - 34, y - 22, 68, 44, (SDL_Color){ 92, 58, 32, 255 });
+        draw_rect(r, x - 28, y - 17, 56, 34, (SDL_Color){ 10, 8, 8, 255 });
+        draw_rect(r, x - 28, y - 17, 56, 5, (SDL_Color){ 40, 30, 26, 255 });
+        for (int k = -1; k <= 1; k += 2) {
+            draw_rect(r, x - 36, y + k * 12 - 2, 8, 4, (SDL_Color){ 60, 60, 66, 255 });   /* charnières */
+        }
+    }
+}
+
+/* Lutrin médiéval (placeholder du socle des objets) : pied, colonne et pupitre incliné. */
+void room_render_lutrin(const Room *room, int i, SDL_Renderer *r, Camera cam)
+{
+    const SDL_FRect *p = &room->props[i];
+    float cx = p->x + p->w * 0.5f - cam.x, feet = p->y + p->h - cam.y;
+    SDL_Color ink = { 40, 24, 16, 255 }, wood = { 128, 78, 40, 255 }, light = { 166, 108, 58, 255 };
+
+    draw_ellipse(r, cx, feet - 4, 30, 8, (SDL_Color){ 60, 40, 30, 90 });
+    /* Pied en croix */
+    draw_rect(r, cx - 25, feet - 10, 50, 9, ink);
+    draw_rect(r, cx - 24, feet - 9, 48, 7, wood);
+    /* Colonne tournée */
+    draw_rect(r, cx - 6, feet - 52, 12, 44, ink);
+    draw_rect(r, cx - 5, feet - 51, 10, 42, wood);
+    draw_rect(r, cx - 8, feet - 36, 16, 5, light);
+    draw_rect(r, cx - 8, feet - 22, 16, 5, light);
+    /* Pupitre incliné, avec un livre de chœur ouvert */
+    draw_rect(r, cx - 26, feet - 66, 52, 16, ink);
+    draw_rect(r, cx - 25, feet - 65, 50, 14, light);
+    draw_rect(r, cx - 22, feet - 72, 21, 10, (SDL_Color){ 236, 226, 200, 255 });
+    draw_rect(r, cx + 1, feet - 72, 21, 10, (SDL_Color){ 226, 214, 186, 255 });
+    draw_rect(r, cx - 1, feet - 72, 2, 10, ink);
+    for (int k = 0; k < 3; k++) {
+        draw_rect(r, cx - 20, feet - 70 + k * 3, 17, 1, (SDL_Color){ 190, 40, 40, 255 });
+        draw_rect(r, cx + 3, feet - 70 + k * 3, 17, 1, (SDL_Color){ 190, 40, 40, 255 });
     }
 }
