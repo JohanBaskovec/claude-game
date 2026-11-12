@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 W, H = 960, 540
 FX0, FY0, FX1, FY1 = 96, 108, 864, 470            # sol
-FONT = "fonts/Junicode-Medium.ttf"
+FONT = "../../../assets/fonts/Junicode-Medium.ttf"
 rng = np.random.default_rng(7)
 
 # ------------------------------------------------------------------ outils

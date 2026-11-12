@@ -3,7 +3,7 @@
 > Document de travail destiné à Claude Code. Il décrit l'univers et les choix de design.
 > **Statut : en cours de conception.** Les sections marquées ✅ sont décidées, 💡 sont des idées à valider, ❓ sont des questions ouvertes.
 > **Source de vérité du design : ce fichier, dans le dépôt** (`docs/concept/GDD.md`). La conception se fait désormais uniquement avec Claude Code, qui le met à jour au fil des décisions prises avec Johan.
-> **Phase en cours : Phase 5 (section 14).** Les Phases 1 à 4 (sections 10 à 13) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
+> **Phase en cours : Phase 6 (section 15), implémentée, en attente de validation.** Les Phases 1 à 5 (sections 10 à 14) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
 
 ---
 
@@ -75,7 +75,7 @@ Comme dans TBOI, le joueur a des attributs chiffrés que les objets modifieront.
 ### Design d'Amadeus ✅
 - ✅ **Objectif** : un gamin moderne qui fait tache dans les époques anciennes.
 - ✅ **Proportions façon TBOI** : grosse tête (environ la moitié du sprite), petit corps. Indispensable pour rester lisible à petite taille.
-- **Tête et corps en sprites séparés**, comme dans TBOI : la tête regarde dans la direction du tir, le corps dans la direction du déplacement.
+- ✅ **Tête et corps en sprites séparés**, comme dans TBOI : la tête regarde dans la direction du tir, le corps dans la direction du déplacement (à l'arrêt, le corps suit la tête).
 - ✅ **Tir** : il chante, donc sa bouche s'ouvre en grand « O » à chaque note (équivalent des larmes d'Isaac).
 - **Couleurs** : des teintes fluo absentes des palettes historiques (rose, vert citron, cyan), pour qu'il ressorte à chaque époque. Au dernier étage (aujourd'hui), il se fond enfin dans le décor.
 - ✅ **Tenue : pyjama + casque audio.** Il s'est enfui la nuit :
@@ -98,11 +98,12 @@ Comme dans TBOI, le joueur a des attributs chiffrés que les objets modifieront.
 - **5 PV.** Contact : 1 PV de dégâts au joueur (provisoire). Plus lent que le joueur, avec de l'inertie, pour qu'on puisse l'esquiver.
 - Les notes le repoussent légèrement et le font clignoter à chaque touche.
 
-Concept visuel 💡 :
-- Enfant Jésus en « petit adulte » : **proportions d'adulte** (petite tête, corps raide et musclé), l'inverse d'Amadeus.
+Concept visuel ✅ (planche de Johan, `assets/sprites/baby/baby_sprite_sheet.png`, cases de 25×56 px) :
+- Enfant Jésus en « petit adulte » : corps de bébé potelé, mais **visage d'adulte**. Torse nu, **en couche** (c'est plus drôle qu'un lange long).
 - Visage de vieillard : calvitie, rides, regard en coin méfiant, bouche pincée.
-- Nimbe doré crucifère derrière la tête, geste de bénédiction à deux doigts, lange.
-- Carnation ocre avec ombres verdâtres (verdaccio des peintres médiévaux), pour ressortir sur le sol parchemin.
+- Auréole légère derrière la tête. Pas de geste de bénédiction.
+- Il regarde dans le sens où il marche ; il marche en trois images (dessinées de profil vers la droite, miroir pour la gauche) et devient tout blanc un instant quand il est touché.
+- Carnation ocre rosée aux ombres brunes, qui ressort sur le sol parchemin.
 - 💡 Comme dans TBOI, **les objets ramassés modifient son apparence** : perruque baroque, tonsure de moine, etc. Il finit en patchwork d'époques.
 
 ### Armes (instruments) ✅
@@ -311,7 +312,7 @@ On découpe par **époques** plutôt que par siècles, car entre le IXe et le XI
 - **Rendu** :
   - l'encre est dessinée en ×2 puis réduite (anticrénelage doux), et appliquée à environ **50 % d'opacité** ;
   - elle est modulée par un bruit d'« usure », comme une encre piétinée.
-  - En SDL : pré-rendre avec **SDL3_ttf** dans une texture, ou exporter un atlas de glyphes.
+  - ✅ En SDL : police chargée depuis `assets/fonts/` et rendue avec **stb_truetype** (glyphes rastérisés une fois au chargement), dans la texture de chaque salle.
 - 💡 **La notation évolue avec les époques**, ce qui renforce le voyage dans le temps. Les barres de mesure n'apparaissent qu'à l'époque baroque : avant, les salles sont délimitées par la mise en page du manuscrit.
 
   | Époque | Notation au sol |
@@ -523,7 +524,7 @@ Cinq objets pour tester la salle du trésor. Les noms viennent des anecdotes de 
 ### Hors périmètre (ne pas faire)
 Écran de mort, boutique, clés et portes à serrure, autres prix (cœurs, clés, partitions…), apparence d'Amadeus modifiée par les objets, boss différents selon l'étage, sons, graphismes finaux.
 
-## 14. PHASE 5 — Armes et premiers neumes (en cours)
+## 14. PHASE 5 — Armes et premiers neumes ✅ (terminée)
 
 **But** : le système de tir paramétrable, les armes du Haut Moyen Âge et quelques neumes pour vérifier que tout se combine.
 
@@ -557,3 +558,49 @@ Cinq objets pour tester la salle du trésor. Les noms viennent des anecdotes de 
 
 ### Hors périmètre (ne pas faire)
 Les autres neumes et objets de polyphonie, les armes des autres époques, l'apparence d'Amadeus selon l'arme, les sons, les graphismes finaux.
+
+## 15. PHASE 6 — Vrais graphismes : décor, Amadeus, bébé ✅ (implémentée, à valider)
+
+**But** : remplacer les placeholders de ce qu'on voit tout le temps par les vrais graphismes en pixel art, d'après la section 9 et les prototypes de `docs/concept/outils_concept/`.
+
+### Périmètre ✅
+- **Décor** (portage de `room_base.py` et `page.py`) : murs de briques en perspective, portes en bois sous un arc de claveaux (ouvertes et fermées), dalles du sol, **sol en manuscrit à neumes** (texte latin continu sur la double page, rubriques et lettrines rouges, encre usée), **reliure** dans la colonne centrale. Grandes salles et salles en L comprises.
+- **Amadeus** (d'après `amadeus_hd.py`) : les 4 directions, la marche, la bouche ouverte quand il chante, le clignotement d'invincibilité.
+- **Le bébé médiéval** : sprite final (section 4), dandinement, éclair blanc quand il est touché.
+
+### Méthode de fabrication ✅
+- Claude ne génère pas d'images directement : il les dessine en écrivant du code ou des données pixel par pixel. Pas de script Python.
+- **Décor calculé en C** par le jeu au début de chaque étage (procédural, comme les prototypes) : chaque salle est dessinée une fois dans une texture, puis affichée. Aucun fichier image.
+- **Police du sol** : Junicode (fichier TTF chargé via `SDL_IOStream`), rendue avec `stb_truetype` (un seul fichier C, domaine public).
+- **Sprites écrits comme grilles de caractères** dans le code (une lettre = une couleur de la palette) : lisibles et retouchables dans un éditeur de texte. Le chargement de PNG (Aseprite) pourra venir plus tard.
+- ✅ **Planches de sprites faites par Johan** : générées par une IA puis nettoyées dans LibreSprite. Elles remplacent les grilles de caractères, qui restent en secours (le jeu les utilise si le PNG manque). Le bébé est le premier chargé depuis sa planche ; marche à 0,15 s par image, en aller-retour 1-2-3-2 (`tuning.baby_walk_frame`, `tuning.baby_walk_pingpong`).
+- ✅ **Format des planches** (dans `assets/sprites/`) :
+  - PNG en RGBA 32 bits, fond vraiment transparent, alpha tout ou rien sur le contour du personnage (pas de bords semi-transparents) ; seul un effet voulu, comme une auréole, peut rester translucide ;
+  - **1 pixel de l'image = 1 pixel du jeu**, à la taille exacte (pas d'image agrandie en « faux pixels ») ;
+  - grille de cases de taille fixe, sans marge ni espace, lues de gauche à droite et de haut en bas ;
+  - contour sombre de 1 px ; pas de limite stricte de couleurs : on garde le modelé de l'image (une réduction à ~32 couleurs ne se voit presque pas et nettoie les pixels parasites, mais elle est facultative) ;
+  - dans chaque case, le personnage est centré horizontalement et ses pieds touchent le bas de la case, à la même place d'une image à l'autre ;
+  - les profils regardent à droite (le jeu fait le miroir pour la gauche).
+- ✅ **Planches attendues** :
+
+  | Fichier | Case | Lignes | Colonnes |
+  |---|---|---|---|
+  | `amadeus_head.png` | 56×48 | face, dos, profil droit | repos, chante (dos : repos seulement) |
+  | `amadeus_body.png` | 56×32 | face, dos, profil droit | repos, pas 1, pas 2 |
+  | `baby/baby_sprite_sheet.png` | 25×56 | une seule | 3 images de marche (ordre de lecture à juger en jeu : 1-2-3-2 proposé) |
+
+  - La tête est posée sur le corps : le bas de la case de la tête recouvre les 8 premières lignes de la case du corps (le menton passe devant le col). Amadeus fait donc au plus 72 px de haut.
+  - L'éclair blanc des dégâts et le clignotement sont calculés par le jeu : pas d'image à faire.
+
+### Précisions de la mise en œuvre ✅
+- **Double page** : chaque page commence par une grande lettrine rouge. Le chant en cours à la fin de la page de gauche s'arrête là ; la page de droite commence par le chant suivant.
+- **Reliure** : ombre du creux sur les dalles et un point de couture (fil clair, son ombre, deux trous) tous les 120 px.
+- **Murs des grandes salles** : un mur qui continue dans la cellule voisine se raccorde brique à brique ; les coins rentrants des salles en L ont leur arête en onglet ; le creux d'une salle en L est noir.
+- **Portes** : la porte dessinée fait à peu près la largeur du passage réel (≈ 50 px au pied du mur en haut et en bas, ≈ 40 px sur les côtés). Ouverte, le passage est noir ; fermée, le bois (planches, ferrures, heurtoir) est posé par-dessus.
+- **Dalles** alignées sur la page entière (pas sur chaque salle), pour que les grandes salles n'aient pas de raccord.
+- **Temps de calcul** : une salle se calcule en 25 à 80 ms. Les salles voisines sont préparées à l'avance, 3 ms par image, pour ne jamais faire sauter d'image.
+- **Amadeus** : deux temps de marche (un chausson levé, les bras qui se balancent, la tête qui descend d'un pixel), tête de face, de dos et de profil, bouche ouverte de face et de profil. Le profil gauche est le miroir du droit (la croche de l'écouteur est donc inversée).
+- **Fichiers** : la police Junicode est rangée dans `assets/fonts/` (avec sa licence), copiée à côté de l'exécutable.
+
+### Hors périmètre (ne pas faire)
+Le Gros Bébé, les objets, les armes, les prix, les meubles (lutrins, coffre, trappe), les tirs et l'interface (phase 7) ; les animations au-delà de la marche et du chant ; les autres époques.

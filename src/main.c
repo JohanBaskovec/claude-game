@@ -11,9 +11,11 @@
 
 #include "config.h"
 #include "debug_menu.h"
+#include "decor.h"
 #include "game.h"
 #include "input.h"
 #include "minimap.h"
+#include "sprite.h"
 #include "text.h"
 
 #define TICK_NS       (SDL_NS_PER_SECOND / TICK_HZ)
@@ -127,6 +129,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
 
     SDL_srand(0);   /* graine aléatoire tirée de l'horloge */
     text_init_from_locale();
+    decor_init();
     game_init(&app->game, random_seed());
     debug_menu_init(&app->debug);
 
@@ -230,6 +233,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
     (void)result;
     App *app = appstate;
+    decor_quit();
+    sprite_quit();
     if (app) {
         SDL_DestroyRenderer(app->renderer);
         SDL_DestroyWindow(app->window);

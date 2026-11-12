@@ -1,5 +1,6 @@
 #include "enemy.h"
 #include "draw.h"
+#include "sprite.h"
 
 #include <math.h>
 
@@ -295,60 +296,24 @@ float enemy_feet_y(const Enemy *e, float alpha)
     return e->prev_y + (e->box.y - e->prev_y) * alpha + e->box.h;
 }
 
-static void fill(SDL_Renderer *r, float x, float y, float w, float h, SDL_Color c)
-{
-    SDL_SetRenderDrawColor(r, c.r, c.g, c.b, c.a);
-    SDL_FRect rect = { SDL_floorf(x), SDL_floorf(y), w, h };
-    SDL_RenderFillRect(r, &rect);
-}
-
 /*
- * Placeholder du bébé médiéval (GDD §4) : proportions d'adulte (petite tête,
- * corps raide dans son lange), carnation ocre, nimbe doré, visage de vieillard.
+ * Bébé médiéval (GDD §4) : proportions d'adulte, visage de vieillard, nimbe crucifère,
+ * bénédiction à deux doigts, lange. Il se dandine sur ses jambes raides et clignote
+ * en blanc quand il est touché. Le sprite regarde à droite.
  */
 static void baby_render(const Enemy *e, SDL_Renderer *r, float alpha, Camera cam)
 {
     float x = e->prev_x + (e->box.x - e->prev_x) * alpha - cam.x;
     float y = e->prev_y + (e->box.y - e->prev_y) * alpha - cam.y;
-    float cx = x + e->box.w * 0.5f;
-    float feet = y + e->box.h;
-    float bob = (SDL_fmodf(e->anim_time, 0.5f) < 0.25f) ? 0.0f : -2.0f;   /* dandinement */
-
-    /* Quand il est touché, il clignote en blanc. */
-    bool flash = e->hurt_timer > 0.0f;
-    SDL_Color white  = { 255, 255, 255, 255 };
-    SDL_Color nimbus = flash ? white : (SDL_Color){ 222, 178, 52, 255 };
-    SDL_Color cross  = flash ? white : (SDL_Color){ 176, 52, 40, 255 };
-    SDL_Color skin   = flash ? white : (SDL_Color){ 196, 150, 96, 255 };
-    SDL_Color green  = flash ? white : (SDL_Color){ 136, 132, 84, 255 };   /* verdaccio */
-    SDL_Color cloth  = flash ? white : (SDL_Color){ 236, 228, 206, 255 };
-    SDL_Color fold   = flash ? white : (SDL_Color){ 196, 186, 160, 255 };
-    SDL_Color ink    = flash ? white : (SDL_Color){ 60, 36, 24, 255 };
-
-    float top = feet - 50.0f + bob;
-    /* Nimbe crucifère derrière la tête */
-    fill(r, cx - 11.0f, top - 2.0f, 22.0f, 20.0f, nimbus);
-    fill(r, cx - 1.0f, top - 2.0f, 2.0f, 6.0f, cross);
-    fill(r, cx - 11.0f, top + 7.0f, 5.0f, 2.0f, cross);
-    fill(r, cx + 6.0f, top + 7.0f, 5.0f, 2.0f, cross);
-    /* Petite tête chauve de vieillard */
-    fill(r, cx - 7.0f, top + 3.0f, 14.0f, 14.0f, skin);
-    fill(r, cx - 7.0f, top + 12.0f, 14.0f, 5.0f, green);
-    fill(r, cx - 5.0f, top + 8.0f, 3.0f, 2.0f, ink);    /* regard en coin */
-    fill(r, cx + 2.0f, top + 8.0f, 3.0f, 2.0f, ink);
-    fill(r, cx - 3.0f, top + 13.0f, 6.0f, 1.0f, ink);   /* bouche pincée */
-    /* Corps raide dans son lange */
-    fill(r, cx - 9.0f, top + 17.0f, 18.0f, 28.0f, cloth);
-    fill(r, cx - 9.0f, top + 24.0f, 18.0f, 2.0f, fold);
-    fill(r, cx - 9.0f, top + 32.0f, 18.0f, 2.0f, fold);
-    fill(r, cx - 9.0f, top + 40.0f, 18.0f, 2.0f, fold);
-    /* Main qui bénit, deux doigts levés */
-    fill(r, cx + 9.0f, top + 18.0f, 4.0f, 6.0f, skin);
-    fill(r, cx + 9.0f, top + 14.0f, 1.0f, 4.0f, skin);
-    fill(r, cx + 11.0f, top + 14.0f, 1.0f, 4.0f, skin);
-    /* Pieds */
-    fill(r, cx - 7.0f, feet - 5.0f + bob, 5.0f, 4.0f, skin);
-    fill(r, cx + 2.0f, feet - 5.0f - bob, 5.0f, 4.0f, skin);
+    float cx = SDL_floorf(x + e->box.w * 0.5f);
+    float feet = SDL_floorf(y + e->box.h);
+    /* Marche : images 0-1-2-1 (aller-retour) ou 0-1-2 (boucle). */
+    static const SpriteId PINGPONG[4] = { SPR_BABY_0, SPR_BABY_1, SPR_BABY_2, SPR_BABY_1 };
+    int steps = tuning.baby_walk_pingpong ? 4 : 3;
+    int step = (int)(e->anim_time / SDL_max(tuning.baby_walk_frame, 0.01f)) % steps;
+    SpriteId id = PINGPONG[step];
+    float top = feet - (float)(sprite_bottom(id) + 1);
+    sprite_draw(r, id, cx - (float)(sprite_width(id) / 2), top, e->vx < 0.0f, e->hurt_timer > 0.0f);
 }
 
 /* Le Gros Bébé est dessiné dans un repère (cx, feet) étiré par (sx, sy) :

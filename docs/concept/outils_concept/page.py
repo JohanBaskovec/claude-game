@@ -14,8 +14,8 @@ PAGE_W, PAGE_H = GRID * CELL_W, GRID * CELL_H
 MARGIN_X = 150                             # marges de la page (visibles seulement dans les salles du bord)
 LINE0, PITCH = 46, 60                      # 6 lignes par salle, toujours aux mêmes hauteurs
 S = 2                                      # suréchantillonnage du rendu de l'encre
-FONT = "fonts/Junicode-Medium.ttf"
-FONT_BOLD = "fonts/Junicode-Bold.ttf"
+FONT = "../../../assets/fonts/Junicode-Medium.ttf"
+FONT_BOLD = "../../../assets/fonts/Junicode-Bold.ttf"
 
 # Textes liturgiques latins du haut Moyen Âge (domaine public)
 CHANTS = [

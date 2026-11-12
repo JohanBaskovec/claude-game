@@ -1,5 +1,7 @@
 #include "player.h"
 #include "config.h"
+#include "draw.h"
+#include "sprite.h"
 
 #include <math.h>
 
@@ -37,6 +39,7 @@ void player_init(Player *p, float center_x, float center_y)
     p->charging = false;
     p->charge_dir = DIR_NONE;
     p->lock_timer = 0.0f;
+    p->walk_phase = 0.0f;
 }
 
 /* Rapproche v de target, avec une constante de temps (0 = immédiat). */
@@ -73,6 +76,14 @@ PlayerFire player_update(Player *p, const Input *in, const Room *room, float fir
     /* Contre un mur, la vitesse sur cet axe tombe à zéro. */
     if (blocked & ROOM_BLOCKED_X) p->vx = 0.0f;
     if (blocked & ROOM_BLOCKED_Y) p->vy = 0.0f;
+
+    /* Animation de marche : elle avance avec la distance parcourue, et revient au repos à l'arrêt. */
+    float moved = sqrtf((p->box.x - p->prev_x) * (p->box.x - p->prev_x) + (p->box.y - p->prev_y) * (p->box.y - p->prev_y));
+    if (moved > 0.2f && tuning.player_step_dist > 0.0f) {
+        p->walk_phase = SDL_fmodf(p->walk_phase + moved / tuning.player_step_dist, 4.0f);
+    } else {
+        p->walk_phase = 0.0f;
+    }
 
     /* Direction de la tête : le tir prime, sinon le déplacement. */
     if (in->shoot != DIR_NONE) {
@@ -150,25 +161,22 @@ bool player_hurt(Player *p, int damage)
     return true;
 }
 
-static void fill(SDL_Renderer *r, float x, float y, float w, float h,
-                 Uint8 cr, Uint8 cg, Uint8 cb)
+/* Sprite de la direction : de dos, de face ou de profil (le profil regarde à droite). */
+static SpriteId facing(Dir d, SpriteId back, SpriteId front, SpriteId side)
 {
-    SDL_SetRenderDrawColor(r, cr, cg, cb, 255);
-    SDL_FRect rect = { SDL_floorf(x), SDL_floorf(y), w, h };
-    SDL_RenderFillRect(r, &rect);
+    return d == DIR_UP ? back : d == DIR_DOWN ? front : side;
 }
 
 /*
- * Placeholder aux proportions d'Amadeus (56x68, grosse tête façon TBOI) :
- * corps cyan, tête couleur peau, casque rose, bouche qui s'ouvre au tir.
+ * Amadeus (GDD §4) : le corps regarde où il marche, la tête où il tire (comme dans TBOI).
  * Les pieds sont posés sur le bas de la boîte de collision.
  */
 void player_render(const Player *p, SDL_Renderer *renderer, float alpha, Camera cam)
 {
     float x = p->prev_x + (p->box.x - p->prev_x) * alpha - cam.x;
     float y = p->prev_y + (p->box.y - p->prev_y) * alpha - cam.y;
-    float cx = x + p->box.w * 0.5f;
-    float feet = y + p->box.h;
+    float cx = SDL_floorf(x + p->box.w * 0.5f);
+    float feet = SDL_floorf(y + p->box.h);
 
     /* Clignotement pendant l'invincibilité : une demi-période sur deux, invisible. */
     if (p->invuln_timer > 0.0f) {
@@ -178,47 +186,34 @@ void player_render(const Player *p, SDL_Renderer *renderer, float alpha, Camera 
         }
     }
 
-    /* Ombre */
-    fill(renderer, cx - 18.0f, feet - 5.0f, 36.0f, 6.0f, 150, 138, 116);
+    draw_ellipse(renderer, cx, feet - 2.0f, 17.0f, 5.0f, (SDL_Color){ 40, 28, 22, 90 });   /* ombre */
 
-    /* Corps (pyjama cyan) et chaussons vert citron */
-    fill(renderer, cx - 13.0f, feet - 30.0f, 26.0f, 26.0f, 40, 210, 230);
-    fill(renderer, cx - 14.0f, feet - 6.0f, 12.0f, 6.0f, 170, 240, 40);
-    fill(renderer, cx + 2.0f,  feet - 6.0f, 12.0f, 6.0f, 170, 240, 40);
+    /* Corps : direction du déplacement (sinon celle de la tête), deux temps de marche. */
+    bool walking = p->walk_phase > 0.0f;
+    Dir body = p->look;
+    if (walking && (p->vx != 0.0f || p->vy != 0.0f)) {
+        body = fabsf(p->vx) > fabsf(p->vy) ? (p->vx > 0.0f ? DIR_RIGHT : DIR_LEFT) : (p->vy > 0.0f ? DIR_DOWN : DIR_UP);
+    }
+    int beat = (int)p->walk_phase;                     /* 0 repos, 1 pas, 2 repos, 3 autre pas */
+    int frame = beat == 1 ? 1 : beat == 3 ? 2 : 0;
+    SpriteId base = facing(body, SPR_AMA_BODY_BACK, SPR_AMA_BODY_FRONT, SPR_AMA_BODY_SIDE);
+    float left = cx - (float)(sprite_width(base) / 2);
+    float body_top = feet - (float)(sprite_bottom(base) + 1);
+    sprite_draw(renderer, (SpriteId)(base + frame), left, body_top, body == DIR_LEFT, false);
 
-    /* Tête */
-    float hx = cx - 21.0f, hy = feet - 68.0f;
-    fill(renderer, hx, hy, 42.0f, 38.0f, 240, 200, 170);
-    /* Cheveux */
-    fill(renderer, hx, hy, 42.0f, 9.0f, 110, 70, 40);
-    /* Casque rose : arceau et écouteurs */
-    fill(renderer, hx + 2.0f, hy - 4.0f, 38.0f, 5.0f, 255, 70, 168);
-    fill(renderer, hx - 5.0f, hy + 12.0f, 8.0f, 16.0f, 255, 70, 168);
-    fill(renderer, hx + 39.0f, hy + 12.0f, 8.0f, 16.0f, 255, 70, 168);
+    /* Tête : direction du tir, bouche ouverte quand il chante ; elle descend d'un pixel à chaque pas. */
+    bool sing = p->sing_timer > 0.0f;
+    SpriteId head = facing(p->look, SPR_AMA_HEAD_BACK,
+                           sing ? SPR_AMA_HEAD_FRONT_SING : SPR_AMA_HEAD_FRONT,
+                           sing ? SPR_AMA_HEAD_SIDE_SING : SPR_AMA_HEAD_SIDE);
+    float head_top = body_top - AMA_HEAD_ABOVE_BODY + (frame ? 1.0f : 0.0f);
+    sprite_draw(renderer, head, left, head_top, p->look == DIR_LEFT, false);
 
     /* Jauge de charge (flûte) au-dessus de la tête. */
     if (p->charging && p->charge > 0.0f) {
-        fill(renderer, cx - 17.0f, hy - 14.0f, 34.0f, 6.0f, 30, 20, 20);
         bool full = p->charge >= 1.0f;
-        fill(renderer, cx - 16.0f, hy - 13.0f, 32.0f * p->charge, 4.0f, full ? 255 : 240, full ? 230 : 160, full ? 120 : 60);
-    }
-
-    /* Visage selon la direction du regard */
-    if (p->look == DIR_UP) {
-        fill(renderer, hx, hy + 9.0f, 42.0f, 14.0f, 110, 70, 40); /* vu de dos */
-        return;
-    }
-    float ox = 0.0f;
-    if (p->look == DIR_LEFT)  ox = -7.0f;
-    if (p->look == DIR_RIGHT) ox =  7.0f;
-    float fx = cx + ox;
-
-    if (p->look != DIR_RIGHT) fill(renderer, fx - 10.0f, hy + 15.0f, 5.0f, 6.0f, 70, 40, 20);
-    if (p->look != DIR_LEFT)  fill(renderer, fx + 5.0f,  hy + 15.0f, 5.0f, 6.0f, 70, 40, 20);
-
-    if (p->sing_timer > 0.0f) {
-        fill(renderer, fx - 5.0f, hy + 25.0f, 10.0f, 9.0f, 90, 20, 30);  /* « O » */
-    } else {
-        fill(renderer, fx - 3.0f, hy + 28.0f, 6.0f, 2.0f, 120, 60, 50);
+        draw_rect(renderer, cx - 17.0f, head_top - 8.0f, 34.0f, 6.0f, (SDL_Color){ 30, 20, 20, 255 });
+        draw_rect(renderer, cx - 16.0f, head_top - 7.0f, 32.0f * p->charge, 4.0f,
+                  full ? (SDL_Color){ 255, 230, 120, 255 } : (SDL_Color){ 240, 160, 60, 255 });
     }
 }

@@ -8,7 +8,7 @@ Roguelike façon *The Binding of Isaac* à travers l'histoire de la musique. C11
 - La conception se fait uniquement dans les sessions Claude Code (plus de session de conception séparée). Relire le GDD au début de chaque nouvelle tâche.
 - Une demande qui dépasse la phase en cours = une nouvelle phase : l'ajouter au GDD (section « PHASE N ») avec son périmètre et son hors-périmètre.
 - **N'implémenter que la phase en cours** du GDD (section « PHASE … à implémenter »). Le reste est du contexte : ne rien coder au-delà sans demande explicite.
-- `docs/concept/outils_concept/` : prototypes Python (Pillow) des visuels, à porter en C plus tard. Ce sont des références, pas du code du jeu.
+- `docs/concept/outils_concept/` : prototypes Python (Pillow) des visuels, portés en C en Phase 6 (`decor.c`, `sprite_data.h`). Ce sont des références, pas du code du jeu.
 - Légende du GDD : ✅ décidé, 💡 idée à valider, ❓ question ouverte.
 
 ## Build
@@ -41,6 +41,11 @@ Web : `emcmake cmake -S . -B build-web` (Emscripten non installé pour l'instant
 - Attributs du joueur (PV, PV max, vitesse, cadence, dégâts, vitesse et portée des tirs) : `tuning.start_*` = valeurs de départ, `player.stats` (`PlayerStats`) = valeurs courantes. Le gameplay lit toujours `player.stats`. Un nouvel attribut s'ajoute aussi au tableau `ROWS` de `debug_menu.c`.
 - Outils de debug : F1 (infos), F2 (menu des attributs et actions comme « Ajouter un bébé », `debug_menu.c` ; une action renvoie un `DebugAction` que `main.c` exécute). La police de debug SDL est en ASCII : pas d'accents dans ces textes.
 - Un module par entité (`player`, `enemy` (bébé et boss), `projectile` (notes, ondes, rayon), `pickup` (prix), `bomb` (métronome), `hazard` (briques, flaques d'encre), `item` (objets passifs), `weapon` (armes), `room`, `floor`, `hud`, `minimap`, `input`, `debug_menu`), chacun avec `_init`, `_update`, `_render`.
+- **Graphismes** (Phase 6) :
+  - `decor.c` : décor calculé pixel par pixel (portage de `room_base.py` et `page.py`) : murs en trapèzes, portes, dalles, manuscrit de la double page, reliure. Une texture par salle, mise en cache pour l'étage (graine) ; le bois des portes fermées est une petite texture par-dessus. La construction est découpée en tranches (`job_run`) : `decor_prefetch` prépare les salles voisines en 3 ms par image.
+  - `font.c` : Junicode via `stb_truetype` (`src/third_party/`), glyphes rastérisés une fois au chargement, texte écrit dans des tampons de couverture.
+  - `sprite.c` + `sprite_data.h` : personnages en planches PNG dessinées par Johan (`assets/sprites/`, table `SHEETS` : fichier et taille de case ; chaque `SpriteId` pointe vers une case) ou, si le PNG manque, en grilles de caractères (une lettre = une couleur de la palette, `.` = transparent). Chaque image a une version blanche pour l'éclair de dégât. Un nouveau sprite = une entrée de `SpriteId` + sa case de planche (et une grille de secours).
+  - Les fichiers du jeu sont dans `assets/` (copié à côté de l'exécutable par CMake, `--preload-file` pour le web) et chargés via `SDL_GetBasePath()` + `SDL_IOStream`.
 - **Tirs** : armes et objets ne codent pas de tir à part, ils règlent une `ShotSpec` (`weapon_shot` dans `weapon.c` : (départ + objets) × arme, plus les objets de forme comme Trope ou Altius) que `fire()` dans `game.c` transforme en projectiles. Un nouvel effet de tir = un champ de `ShotSpec` / `Projectile`, pour qu'il se combine avec tout le reste. Les armes sont décrites dans `tuning.weapons[]`.
 - `draw.c` : petites primitives de dessin partagées (rectangle, ellipse, trait, icônes métronome/couronne, chiffres pixel, texte avec la police de debug en retirant les accents).
 - Rendu d'une salle en couches (`game.c`) : sol et trappe → ombres au sol → tout ce qui est trié par la position des pieds (joueur, ennemis, lutrins, métronomes, prix) → ce qui est en l'air (briques qui tombent, notes, explosions). Un nouvel objet posé au sol s'ajoute à la liste triée.

@@ -1,5 +1,6 @@
 #include "game.h"
 #include "config.h"
+#include "decor.h"
 #include "minimap.h"
 
 #include <math.h>
@@ -651,6 +652,7 @@ static void render_room_contents(const Game *g, SDL_Renderer *r, float alpha, Ca
 
 void game_render(const Game *g, SDL_Renderer *r, float alpha)
 {
+    decor_set_floor(g->floor.seed);
     Camera cam = game_camera(g, alpha);
     const Transition *t = &g->transition;
 
@@ -680,4 +682,7 @@ void game_render(const Game *g, SDL_Renderer *r, float alpha)
     if (boss && !t->active) hud_render_boss(r, boss->hp, boss->max_hp);
     int hover = game_can_teleport(g, g->map_hover) ? g->map_hover : -1;
     minimap_render(&g->floor, g->room.index, r, g->reveal_map, hover);
+
+    /* Hors des glissements, on dessine à l'avance une salle voisine par image. */
+    if (!t->active) decor_prefetch(&g->floor, g->room.index, r);
 }

@@ -33,6 +33,7 @@ typedef struct Player {
     bool      charging;
     Dir       charge_dir;
     float     lock_timer;   /* > 0 : cloué sur place (orgue) */
+    float     walk_phase;   /* animation de marche : avance d'un temps tous les player_step_dist px */
 } Player;
 
 /* Tir demandé par le joueur pendant un pas. */

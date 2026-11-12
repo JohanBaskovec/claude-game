@@ -84,6 +84,9 @@ typedef struct Tuning {
     float player_hitbox_h;
     float player_invuln_time;  /* invincibilité après un coup, s */
     float player_blink_hz;     /* clignotements par seconde pendant l'invincibilité */
+    float player_step_dist;    /* px parcourus par temps de l'animation de marche */
+    float baby_walk_frame;     /* s par image de la marche du bébé */
+    bool  baby_walk_pingpong;  /* marche du bébé : 0-1-2-1 (true) ou 0-1-2 (false) */
 
     /* Tir */
     float shot_size;           /* boîte de collision du projectile (carrée), px */

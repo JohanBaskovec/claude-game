@@ -42,9 +42,11 @@ add_executable(fugue
     src/bomb.c
     src/config.c
     src/debug_menu.c
+    src/decor.c
     src/draw.c
     src/enemy.c
     src/floor.c
+    src/font.c
     src/game.c
     src/hazard.c
     src/hud.c
@@ -55,11 +57,19 @@ add_executable(fugue
     src/player.c
     src/projectile.c
     src/room.c
+    src/sprite.c
     src/text.c
     src/weapon.c
 )
 
 target_link_libraries(fugue PRIVATE SDL3::SDL3)
+
+# Assets (police, planches de sprites) copiés à côté de l'exécutable : le jeu les cherche via
+# SDL_GetBasePath(). Cible à part, recopiée à chaque build : changer un PNG ne recompile rien.
+add_custom_target(fugue_assets ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/assets $<TARGET_FILE_DIR:fugue>/assets
+    COMMENT "Copie des assets")
+add_dependencies(fugue_assets fugue)
 
 if(MSVC)
     target_compile_options(fugue PRIVATE /W4)
@@ -72,6 +82,7 @@ endif()
 
 if(EMSCRIPTEN)
     # Build web : produit fugue.html + fugue.js + fugue.wasm.
-    # Les assets seront ajoutés plus tard avec --preload-file.
     set_target_properties(fugue PROPERTIES SUFFIX ".html")
+    target_link_options(fugue PRIVATE "--preload-file=${CMAKE_SOURCE_DIR}/assets@/assets"
+                                      "-sINITIAL_MEMORY=64MB" "-sALLOW_MEMORY_GROWTH=1")
 endif()

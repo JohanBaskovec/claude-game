@@ -19,6 +19,9 @@ Tuning tuning = {
     .player_hitbox_h   = 24.0f,
     .player_invuln_time = 1.0f,
     .player_blink_hz    = 10.0f,
+    .player_step_dist   = 16.0f,
+    .baby_walk_frame    = 0.15f,
+    .baby_walk_pingpong = true,
 
     .shot_size     = 10.0f,
     .shot_height   = 34.0f,

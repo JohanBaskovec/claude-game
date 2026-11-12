@@ -3,7 +3,7 @@
 Roguelike façon *The Binding of Isaac* à travers l'histoire de la musique. C11 + SDL3.
 Le design est dans [`docs/concept/GDD.md`](docs/concept/GDD.md).
 
-**État : Phase 5** — une vraie partie (étages, prix, métronomes-bombes, salle du trésor, Gros Bébé, trappe) et les armes du Haut Moyen Âge (voix, olifant, flûte, lyre, tabourin, cloche, orgue) avec les premiers neumes (graphismes provisoires).
+**État : Phase 6** — une vraie partie (étages, prix, métronomes-bombes, salle du trésor, Gros Bébé, trappe), les armes du Haut Moyen Âge (voix, olifant, flûte, lyre, tabourin, cloche, orgue) avec les premiers neumes, et les vrais graphismes du décor (château, portes, sol en manuscrit à neumes sur une double page avec sa reliure), d'Amadeus et du bébé médiéval. Les autres graphismes sont encore provisoires.
 
 ## Compiler et lancer
 
@@ -15,6 +15,9 @@ cmake --build build -j
 
 SDL3 est utilisé s'il est installé sur le système. Sinon, il est téléchargé
 et compilé avec le projet (plusieurs minutes la première fois).
+
+Le dossier `assets/` (police du sol) est copié à côté de l'exécutable à chaque build :
+le jeu le cherche là. Sans lui, le sol s'affiche sans texte.
 
 Build web (Emscripten, avec `emsdk` activé) :
 
@@ -41,3 +44,16 @@ cmake --build build-web -j
 
 En jeu, **F2** permet de modifier les attributs du joueur en direct.
 Les valeurs de départ et tous les autres paramètres sont dans [`src/config.c`](src/config.c).
+
+## Graphismes
+
+- **Décor** (`src/decor.c`) : calculé par le jeu, sans fichier image, d'après les prototypes de
+  `docs/concept/outils_concept/`. Chaque salle est dessinée une fois dans une texture ; les salles
+  voisines sont préparées à l'avance, quelques millisecondes par image.
+- **Personnages** (`src/sprite_data.h`) : des grilles de caractères, une lettre par couleur de la
+  palette. On les retouche dans un éditeur de texte.
+
+## Licences tierces
+
+- [Junicode](https://github.com/psb1558/Junicode-font) de Peter S. Baker (`assets/fonts/`) : SIL Open Font License 1.1, voir `assets/fonts/OFL.txt`.
+- [stb_truetype](https://github.com/nothings/stb) de Sean Barrett (`src/third_party/`) : domaine public.

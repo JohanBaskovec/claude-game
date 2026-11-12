@@ -1,5 +1,6 @@
 #include "room.h"
 #include "config.h"
+#include "decor.h"
 #include "draw.h"
 
 /* Distance à laquelle le joueur arrive devant la porte, depuis le bord du sol. */
@@ -294,68 +295,9 @@ Camera room_camera(const Room *room, float x, float y)
     return cam;
 }
 
-static void fill(SDL_Renderer *r, Camera cam, SDL_FRect rect, Uint8 cr, Uint8 cg, Uint8 cb)
-{
-    SDL_SetRenderDrawColor(r, cr, cg, cb, 255);
-    rect.x = SDL_floorf(rect.x - cam.x);
-    rect.y = SDL_floorf(rect.y - cam.y);
-    SDL_RenderFillRect(r, &rect);
-}
-
-static void render_door(SDL_Renderer *r, Camera cam, const RoomDoor *d, bool open)
-{
-    /* Encadrement de pierre claire, un peu plus large que l'ouverture. */
-    SDL_FRect frame = d->opening;
-    if (d->side == DIR_UP || d->side == DIR_DOWN) {
-        frame.x -= 10.0f;
-        frame.w += 20.0f;
-    } else {
-        frame.y -= 10.0f;
-        frame.h += 20.0f;
-    }
-    fill(r, cam, frame, 120, 110, 100);
-
-    if (open) {
-        fill(r, cam, d->opening, 22, 18, 16);
-        return;
-    }
-    /* Porte fermée : planches de bois. */
-    fill(r, cam, d->opening, 112, 72, 42);
-    SDL_FRect o = d->opening;
-    bool vertical_planks = (d->side == DIR_UP || d->side == DIR_DOWN);
-    int planks = 4;
-    for (int i = 1; i < planks; i++) {
-        SDL_FRect line = vertical_planks
-            ? (SDL_FRect){ o.x + o.w * (float)i / (float)planks, o.y, 2.0f, o.h }
-            : (SDL_FRect){ o.x, o.y + o.h * (float)i / (float)planks, o.w, 2.0f };
-        fill(r, cam, line, 78, 48, 28);
-    }
-}
-
 void room_render(const Room *room, SDL_Renderer *r, Camera cam)
 {
-    /* Murs : une bande autour de chaque cellule. */
-    for (int i = 0; i < room->cell_count; i++) {
-        SDL_FRect c = room->cells[i];
-        SDL_FRect band = { c.x - WALL_SIDE, c.y - WALL_TOP, c.w + 2.0f * WALL_SIDE, c.h + WALL_TOP + WALL_BOTTOM };
-        fill(r, cam, band, 62, 54, 50);
-    }
-    /* Liseré au pied des murs. */
-    for (int i = 0; i < room->cell_count; i++) {
-        SDL_FRect c = room->cells[i];
-        fill(r, cam, (SDL_FRect){ c.x - 6.0f, c.y - 6.0f, c.w + 12.0f, c.h + 12.0f }, 92, 82, 76);
-    }
-    for (int i = 0; i < room->door_count; i++) {
-        render_door(r, cam, &room->doors[i], room->doors_open);
-    }
-    /* Sol : parchemin terne, avec 6 lignes très pâles par cellule (repère d'échelle). */
-    for (int i = 0; i < room->cell_count; i++) {
-        SDL_FRect c = room->cells[i];
-        fill(r, cam, c, 196, 184, 160);
-        for (int k = 0; k < 6; k++) {
-            fill(r, cam, (SDL_FRect){ c.x, c.y + 46.0f + 60.0f * (float)k, c.w, 2.0f }, 184, 171, 146);
-        }
-    }
+    decor_render_room(room, r, cam);
 
     if (room->trapdoor) {
         /* Trappe : cadre de bois et trou noir. */
