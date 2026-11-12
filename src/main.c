@@ -1,5 +1,6 @@
 /*
- * Fugue in Amadeus Minor — Phase 1 : prototype de déplacement et de tir.
+ * Fugue in Amadeus Minor — fenêtre, entrées, boucle de jeu.
+ * Les règles du jeu sont dans game.c.
  *
  * Modèle à callbacks de SDL3 (pas de boucle while bloquante),
  * indispensable pour le build navigateur (Emscripten).
@@ -9,10 +10,9 @@
 #include <SDL3/SDL_main.h>
 
 #include "config.h"
+#include "debug_menu.h"
+#include "game.h"
 #include "input.h"
-#include "player.h"
-#include "projectile.h"
-#include "room.h"
 
 #define TICK_NS       (SDL_NS_PER_SECOND / TICK_HZ)
 #define MAX_FRAME_NS  (SDL_NS_PER_SECOND / 4)   /* au-delà, on ralentit plutôt que d'enchaîner les pas */
@@ -21,9 +21,8 @@ typedef struct App {
     SDL_Window     *window;
     SDL_Renderer   *renderer;
 
-    Room            room;
-    Player          player;
-    ProjectilePool  shots;
+    Game            game;
+    DebugMenu       debug;
 
     Uint64          last_ns;
     Uint64          accumulator_ns;
@@ -47,25 +46,12 @@ static int initial_scale(void)
     return scale;
 }
 
-static void fire(App *app, Dir dir)
-{
-    float dx, dy, cx, cy;
-    dir_vector(dir, &dx, &dy);
-    player_center(&app->player, &cx, &cy);
-
-    float vx = dx * tuning.shot_speed + app->player.vx * tuning.shot_inherit;
-    float vy = dy * tuning.shot_speed + app->player.vy * tuning.shot_inherit;
-    projectile_spawn(&app->shots, cx + dx * 8.0f, cy + dy * 8.0f, vx, vy, tuning.shot_range);
-}
-
 static void step(App *app, float dt)
 {
+    debug_menu_update(&app->debug, dt, &app->game.player.stats);
+
     Input in = input_sample();
-    Dir shot = player_update(&app->player, &in, &app->room, dt);
-    projectile_update_all(&app->shots, &app->room, dt);
-    if (shot != DIR_NONE) {
-        fire(app, shot);
-    }
+    game_step(&app->game, &in, dt);
 }
 
 static void render(App *app, float alpha)
@@ -74,19 +60,18 @@ static void render(App *app, float alpha)
     SDL_SetRenderDrawColor(r, 0, 0, 0, 255);
     SDL_RenderClear(r);
 
-    room_render(&app->room, r);
-    player_render(&app->player, r, alpha);
-    projectile_render_all(&app->shots, r, alpha);
+    const Game *g = &app->game;
+    game_render(g, r, alpha);
 
     if (app->show_debug) {
         SDL_SetRenderDrawColor(r, 255, 255, 255, 255);
-        SDL_RenderDebugTextFormat(r, 8, 8, "FPS %.0f  notes %d", app->fps, projectile_count(&app->shots));
-        SDL_RenderDebugTextFormat(r, 8, 20, "vitesse %.0f  accel %.2fs  frein %.2fs",
-                                  tuning.player_speed, tuning.player_accel_time, tuning.player_decel_time);
-        SDL_RenderDebugTextFormat(r, 8, 32, "cadence %.1f/s  tir %.0f px/s  portee %.0f  heritage %.2f",
-                                  tuning.fire_rate, tuning.shot_speed, tuning.shot_range, tuning.shot_inherit);
-        SDL_RenderDebugTextFormat(r, 8, 44, "joueur v=(%.0f, %.0f)", app->player.vx, app->player.vy);
+        SDL_RenderDebugTextFormat(r, 8, GAME_H - 30, "FPS %.0f  notes %d  ennemis %d  morts %d",
+                                  app->fps, projectile_count(&g->shots), enemy_count(&g->enemies), g->deaths);
+        SDL_RenderDebugTextFormat(r, 8, GAME_H - 18, "joueur v=(%.0f, %.0f)  PV %d/%d  invincible %.2fs",
+                                  g->player.vx, g->player.vy, g->player.stats.hp, g->player.stats.max_hp,
+                                  SDL_max(g->player.invuln_timer, 0.0f));
     }
+    debug_menu_render(&app->debug, r, &g->player.stats);
 
     SDL_RenderPresent(r);
 }
@@ -119,11 +104,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
                                      SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
     SDL_SetRenderVSync(app->renderer, 1);
 
-    room_init(&app->room);
-    player_init(&app->player,
-                ROOM_FLOOR_X + ROOM_FLOOR_W * 0.5f,
-                ROOM_FLOOR_Y + ROOM_FLOOR_H * 0.5f);
-    projectile_pool_clear(&app->shots);
+    SDL_srand(0);   /* graine aléatoire tirée de l'horloge */
+    game_init(&app->game);
+    debug_menu_init(&app->debug);
 
     app->last_ns = SDL_GetTicksNS();
     app->fps_window_start = app->last_ns;
@@ -147,6 +130,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         case SDL_SCANCODE_F1:
             app->show_debug = !app->show_debug;
             break;
+        case SDL_SCANCODE_F2:
+            debug_menu_toggle(&app->debug);
+            break;
         case SDL_SCANCODE_F11: {
             bool fs = (SDL_GetWindowFlags(app->window) & SDL_WINDOW_FULLSCREEN) != 0;
             SDL_SetWindowFullscreen(app->window, !fs);
@@ -158,6 +144,13 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     }
 
     input_handle_event(event);
+
+    /* Souris : passage des coordonnées fenêtre aux coordonnées du jeu (960x540). */
+    SDL_Event local = *event;
+    SDL_ConvertEventToRenderCoordinates(app->renderer, &local);
+    if (debug_menu_handle_event(&app->debug, &local, &app->game.player.stats) == DEBUG_ACTION_SPAWN_BABY) {
+        game_spawn_baby(&app->game);
+    }
     return SDL_APP_CONTINUE;
 }
 

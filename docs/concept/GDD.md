@@ -2,7 +2,8 @@
 
 > Document de travail destiné à Claude Code. Il décrit l'univers et les choix de design.
 > **Statut : en cours de conception.** Les sections marquées ✅ sont décidées, 💡 sont des idées à valider, ❓ sont des questions ouvertes.
-> **Pour l'instant, seule la Phase 1 (section 10) doit être implémentée.** Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
+> **Source de vérité du design : ce fichier, dans le dépôt** (`docs/concept/GDD.md`). La conception se fait désormais uniquement avec Claude Code, qui le met à jour au fil des décisions prises avec Johan.
+> **Phase en cours : Phase 2 (section 11).** La Phase 1 (section 10) est terminée. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
 
 ---
 
@@ -47,6 +48,30 @@ Un roguelike en 2D vue de dessus, dans la lignée de *The Binding of Isaac* : on
 - ✅ On trouve ensuite des **instruments d'époque**, qui servent d'armes.
 - ✅ L'anachronisme est voulu et fait partie de l'humour : on peut se retrouver avec un saxophone face à des moines du Xe siècle.
 
+### Attributs du joueur ✅
+Comme dans TBOI, le joueur a des attributs chiffrés que les objets modifieront.
+
+| Attribut | Valeur de départ | Unité | Notes |
+|---|---|---|---|
+| Points de vie | **10** | PV | PV actuels. Ne dépassent jamais les PV maximum. |
+| PV maximum | **10** | PV | Équivalent des réceptacles de cœur de TBOI. Plafond absolu : 100 (provisoire). Voir « Barre de vie » en section 5. |
+| Vitesse de déplacement | 270 | px/s | |
+| Cadence de tir | 3,0 | notes/s | |
+| Dégâts | 1,0 | PV ennemis | Dégâts de chaque note, fixés au moment où elle part. Peut être fractionnaire (objets multiplicateurs). |
+| Vitesse des tirs | 480 | px/s | |
+| Portée des tirs | 340 | px | Distance parcourue avant que la note disparaisse. |
+
+- Les valeurs de départ sont provisoires, à régler avec le menu de debug (section 10).
+- ✅ Comme dans TBOI, on distingue **PV actuels** et **PV maximum** : un soin remplit la barre sans l'allonger, un objet « réceptacle » augmente le maximum.
+- **Dégâts subis** : on perd des PV, puis on a une courte **invincibilité** (≈ 1 s, provisoire) pendant laquelle le personnage **clignote**, comme dans TBOI. À 0 PV, c'est la mort.
+- ✅ Attribut **Dégâts**, comme TBOI. Les PV des ennemis sont donc fractionnaires ; ceux du joueur restent entiers.
+
+### Barre de vie : un soufflet de crescendo ✅
+- La barre de vie a la forme d'un **soufflet de crescendo** (<) : deux traits qui s'écartent de gauche à droite.
+- L'intérieur du soufflet **se remplit** selon les PV actuels, depuis la pointe : à 0 PV il est vide, à PV max il est plein. Une perte de PV se vide en douceur, pour que le joueur la voie.
+- La **longueur** du soufflet grandit avec les PV maximum : gagner un réceptacle allonge le crescendo.
+- Placée en haut à gauche de l'écran, sur le mur du haut.
+
 ### Design d'Amadeus ✅
 - ✅ **Objectif** : un gamin moderne qui fait tache dans les époques anciennes.
 - ✅ **Proportions façon TBOI** : grosse tête (environ la moitié du sprite), petit corps. Indispensable pour rester lisible à petite taille.
@@ -68,7 +93,12 @@ Un roguelike en 2D vue de dessus, dans la lignée de *The Binding of Isaac* : on
   - Deux états : repos (petite bouche inquiète) et chante (bouche grande ouverte).
   - L'ancien concept 28×33 px (pour 480×270) est abandonné.
 
-### Bébé médiéval (premier concept) 💡
+### Bébé médiéval : premier ennemi ✅
+- **Premier ennemi implémenté** (Phase 2) : il **suit le joueur** et le blesse **au contact**, comme les Gapers de TBOI.
+- **5 PV.** Contact : 1 PV de dégâts au joueur (provisoire). Plus lent que le joueur, avec de l'inertie, pour qu'on puisse l'esquiver.
+- Les notes le repoussent légèrement et le font clignoter à chaque touche.
+
+Concept visuel 💡 :
 - Enfant Jésus en « petit adulte » : **proportions d'adulte** (petite tête, corps raide et musclé), l'inverse d'Amadeus.
 - Visage de vieillard : calvitie, rides, regard en coin méfiant, bouche pincée.
 - Nimbe doré crucifère derrière la tête, geste de bénédiction à deux doigts, lange.
@@ -244,7 +274,7 @@ On découpe par **époques** plutôt que par siècles, car entre le IXe et le XI
 
 ---
 
-## 10. PHASE 1 — Prototype minimal ✅ (à implémenter maintenant)
+## 10. PHASE 1 — Prototype minimal ✅ (terminée)
 
 **But** : valider les sensations de déplacement et de tir. Rien d'autre.
 
@@ -258,9 +288,13 @@ On découpe par **époques** plutôt que par siècles, car entre le IXe et le XI
   - ils disparaissent aussi en touchant un mur ;
   - 💡 bonus si simple : le projectile hérite d'une partie de la vitesse du joueur, comme dans TBOI.
 - **Paramètres regroupés dans un seul endroit** pour être faciles à ajuster : vitesse du joueur, cadence, vitesse des projectiles, portée.
+- ✅ **Attributs du joueur** (section 4) : points de vie, vitesse de déplacement, cadence de tir, vitesse des tirs, portée des tirs. Les valeurs de départ viennent des paramètres ; le joueur garde ses valeurs courantes, que les objets modifieront plus tard.
+- ✅ **Outils de debug** (non traduits, réservés au développement) :
+  - **F1** : FPS et infos techniques ;
+  - **F2** : menu des attributs du joueur, avec des boutons **−** et **+** cliquables à la souris pour les modifier en direct pendant la partie, et un bouton pour revenir aux valeurs de départ.
 
 ### Hors périmètre (ne pas faire)
-Ennemis, objets, salles multiples, vie, sons, graphismes finaux, menus.
+Ennemis, objets, salles multiples, dégâts et mort (les PV existent mais rien ne les fait baisser), sons, graphismes finaux, menus du jeu.
 
 ### Technique ✅
 - **Langage : C.** **Bibliothèque : SDL3** (fenêtre, entrées, rendu 2D via `SDL_Renderer`). Pas de moteur.
@@ -291,3 +325,22 @@ Ennemis, objets, salles multiples, vie, sons, graphismes finaux, menus.
 - Conséquence : les sprites doivent être dessinés pour 960×540. Amadeus fait désormais 56×68 px.
 - Utiliser `SDL_SetRenderLogicalPresentation` en mode *integer scale*, et `SDL_SCALEMODE_NEAREST` pour garder des pixels nets.
 - ❓ Taille des tuiles et dimensions exactes d'une salle 1×1, à ajuster une fois le prototype en main. Le concept v2 donne un point de départ.
+
+---
+
+## 11. PHASE 2 — Premier ennemi, vie et dégâts (en cours)
+
+**But** : valider la boucle de combat de base : esquiver, tirer, prendre des coups.
+
+### Périmètre
+- ✅ **PV actuels et PV maximum** (section 4), modifiables dans le menu de debug F2.
+- ✅ **Barre de vie en soufflet de crescendo** (section 4), en haut à gauche.
+- ✅ **Bébé médiéval** (section 4) : suit le joueur, 5 PV, dégâts au contact. Placeholder en formes simples.
+- ✅ **Les notes blessent les ennemis** (attribut Dégâts, 1 au départ) et disparaissent en les touchant.
+- ✅ **Invincibilité après un coup** (≈ 1 s) avec clignotement du joueur.
+- **Mort (provisoire)** : à 0 PV, la salle recommence (joueur au centre avec tous ses PV, un nouveau bébé). Il n'y a pas encore d'écran de fin de partie.
+- **Debug** : le menu F2 permet aussi de faire apparaître un bébé.
+
+### Hors périmètre (ne pas faire)
+Autres ennemis, objets, salles multiples, écran de mort, sons, graphismes finaux, menus du jeu.
+

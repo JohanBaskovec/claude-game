@@ -40,6 +40,10 @@ endif()
 add_executable(fugue
     src/main.c
     src/config.c
+    src/debug_menu.c
+    src/enemy.c
+    src/game.c
+    src/hud.c
     src/input.c
     src/player.c
     src/projectile.c

@@ -14,6 +14,7 @@ typedef struct Projectile {
     float vx, vy;          /* px/s */
     float traveled;        /* distance parcourue, px */
     float range;           /* distance maximale, px */
+    float damage;          /* dégâts infligés, fixés au moment du tir */
 } Projectile;
 
 typedef struct ProjectilePool {
@@ -23,7 +24,7 @@ typedef struct ProjectilePool {
 void projectile_pool_clear(ProjectilePool *pool);
 
 /* Renvoie false si le pool est plein (le tir est alors ignoré). */
-bool projectile_spawn(ProjectilePool *pool, float x, float y, float vx, float vy, float range);
+bool projectile_spawn(ProjectilePool *pool, float x, float y, float vx, float vy, float range, float damage);
 
 void projectile_update_all(ProjectilePool *pool, const Room *room, float dt);
 

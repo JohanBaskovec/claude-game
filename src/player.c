@@ -3,8 +3,22 @@
 
 #include <math.h>
 
+PlayerStats player_start_stats(void)
+{
+    return (PlayerStats){
+        .hp         = tuning.start_hp,
+        .max_hp     = tuning.start_max_hp,
+        .speed      = tuning.start_speed,
+        .fire_rate  = tuning.start_fire_rate,
+        .damage     = tuning.start_damage,
+        .shot_speed = tuning.start_shot_speed,
+        .shot_range = tuning.start_shot_range,
+    };
+}
+
 void player_init(Player *p, float center_x, float center_y)
 {
+    p->stats = player_start_stats();
     p->box.w = tuning.player_hitbox_w;
     p->box.h = tuning.player_hitbox_h;
     p->box.x = center_x - p->box.w * 0.5f;
@@ -15,6 +29,7 @@ void player_init(Player *p, float center_x, float center_y)
     p->look = DIR_DOWN;
     p->fire_cooldown = 0.0f;
     p->sing_timer = 0.0f;
+    p->invuln_timer = 0.0f;
 }
 
 /* Rapproche v de target, avec une constante de temps (0 = immédiat). */
@@ -35,8 +50,8 @@ Dir player_update(Player *p, const Input *in, const Room *room, float dt)
     /* Déplacement avec accélération / freinage. */
     bool moving = in->move_x != 0.0f || in->move_y != 0.0f;
     float tc = moving ? tuning.player_accel_time : tuning.player_decel_time;
-    p->vx = approach(p->vx, in->move_x * tuning.player_speed, tc, dt);
-    p->vy = approach(p->vy, in->move_y * tuning.player_speed, tc, dt);
+    p->vx = approach(p->vx, in->move_x * p->stats.speed, tc, dt);
+    p->vy = approach(p->vy, in->move_y * p->stats.speed, tc, dt);
     if (fabsf(p->vx) < 1.0f && in->move_x == 0.0f) p->vx = 0.0f;
     if (fabsf(p->vy) < 1.0f && in->move_y == 0.0f) p->vy = 0.0f;
 
@@ -60,11 +75,14 @@ Dir player_update(Player *p, const Input *in, const Room *room, float dt)
     if (p->sing_timer > 0.0f) {
         p->sing_timer -= dt;
     }
+    if (p->invuln_timer > 0.0f) {
+        p->invuln_timer -= dt;
+    }
     Dir fired = DIR_NONE;
     /* Petite tolérance : évite qu'une erreur d'arrondi décale un tir d'une image. */
     if (in->shoot != DIR_NONE && p->fire_cooldown <= 1e-4f) {
         /* += plutôt que = : la cadence reste exacte quel que soit le pas. */
-        p->fire_cooldown += 1.0f / tuning.fire_rate;
+        p->fire_cooldown += 1.0f / p->stats.fire_rate;
         p->sing_timer = tuning.sing_duration;
         fired = in->shoot;
     }
@@ -79,6 +97,20 @@ void player_center(const Player *p, float *x, float *y)
 {
     *x = p->box.x + p->box.w * 0.5f;
     *y = p->box.y + p->box.h * 0.5f;
+}
+
+bool player_hurt(Player *p, int damage)
+{
+    /* Petite tolérance : évite qu'une erreur d'arrondi rallonge l'invincibilité d'une image. */
+    if (p->invuln_timer > 1e-4f || p->stats.hp <= 0) {
+        return false;
+    }
+    p->stats.hp -= damage;
+    if (p->stats.hp < 0) {
+        p->stats.hp = 0;
+    }
+    p->invuln_timer = tuning.player_invuln_time;
+    return true;
 }
 
 static void fill(SDL_Renderer *r, float x, float y, float w, float h,
@@ -100,6 +132,14 @@ void player_render(const Player *p, SDL_Renderer *renderer, float alpha)
     float y = p->prev_y + (p->box.y - p->prev_y) * alpha;
     float cx = x + p->box.w * 0.5f;
     float feet = y + p->box.h;
+
+    /* Clignotement pendant l'invincibilité : une demi-période sur deux, invisible. */
+    if (p->invuln_timer > 0.0f) {
+        int phase = (int)(p->invuln_timer * tuning.player_blink_hz * 2.0f);
+        if (phase % 2 == 1) {
+            return;
+        }
+    }
 
     /* Ombre */
     fill(renderer, cx - 18.0f, feet - 5.0f, 36.0f, 6.0f, 150, 138, 116);

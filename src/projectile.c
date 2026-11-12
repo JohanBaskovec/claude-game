@@ -9,7 +9,7 @@ void projectile_pool_clear(ProjectilePool *pool)
     }
 }
 
-bool projectile_spawn(ProjectilePool *pool, float x, float y, float vx, float vy, float range)
+bool projectile_spawn(ProjectilePool *pool, float x, float y, float vx, float vy, float range, float damage)
 {
     for (int i = 0; i < MAX_PROJECTILES; i++) {
         Projectile *pr = &pool->items[i];
@@ -21,6 +21,7 @@ bool projectile_spawn(ProjectilePool *pool, float x, float y, float vx, float vy
             pr->vy = vy;
             pr->traveled = 0.0f;
             pr->range = range;
+            pr->damage = damage;
             return true;
         }
     }
