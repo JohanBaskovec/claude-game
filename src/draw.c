@@ -125,9 +125,9 @@ float draw_number(SDL_Renderer *r, float x, float y, int value, int min_digits, 
 static void fold_ascii(const char *in, char *out, size_t size)
 {
     static const char *from[] = { "à", "â", "ä", "é", "è", "ê", "ë", "î", "ï", "ô", "ö", "ù", "û", "ü", "ç",
-                                  "À", "Â", "É", "È", "Ê", "Î", "Ô", "Ù", "Û", "Ç", "œ", "Œ", "’", "×" };
+                                  "À", "Â", "É", "È", "Ê", "Î", "Ô", "Ù", "Û", "Ç", "œ", "Œ", "’", "×", "« ", " »", "«", "»", "…", "—", "\u00a0" };
     static const char *to[]   = { "a", "a", "a", "e", "e", "e", "e", "i", "i", "o", "o", "u", "u", "u", "c",
-                                  "A", "A", "E", "E", "E", "I", "O", "U", "U", "C", "oe", "OE", "'", "x" };
+                                  "A", "A", "E", "E", "E", "I", "O", "U", "U", "C", "oe", "OE", "'", "x", "\"", "\"", "\"", "\"", "...", "-", " " };
     size_t o = 0;
     while (*in && o + 3 < size) {
         bool done = false;

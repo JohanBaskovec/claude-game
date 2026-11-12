@@ -3,7 +3,7 @@
 Roguelike façon *The Binding of Isaac* à travers l'histoire de la musique. C11 + SDL3.
 Le design est dans [`docs/concept/GDD.md`](docs/concept/GDD.md).
 
-**État : Phase 4** — une vraie partie : étages générés, prix de fin de salle (métronomes et royalties), métronomes-bombes, salle du trésor (3 objets au choix), Gros Bébé (boss), trappe vers l'étage suivant, mort = nouvelle partie (graphismes provisoires).
+**État : Phase 5** — une vraie partie (étages, prix, métronomes-bombes, salle du trésor, Gros Bébé, trappe) et les armes du Haut Moyen Âge (voix, olifant, flûte, lyre, tabourin, cloche, orgue) avec les premiers neumes (graphismes provisoires).
 
 ## Compiler et lancer
 
@@ -29,11 +29,11 @@ cmake --build build-web -j
 | Touche | Action |
 |---|---|
 | ZQSD (AZERTY) / WASD (QWERTY) | Se déplacer (touches lues par position physique) |
-| Flèches | Chanter (tirer) — la dernière flèche enfoncée l'emporte |
+| Flèches | Chanter (tirer) — la dernière flèche enfoncée l'emporte. Flûte : maintenir pour charger, relâcher pour tirer |
 | E | Poser un métronome (bombe) |
 | F1 | Infos de debug (FPS, étage et graine, salle actuelle, objets pris) |
 | Clic sur la mini-carte | Se téléporter dans une salle déjà visitée (hors combat) |
-| F2 | Menu de debug : attributs du joueur modifiables à la souris (− / +, maintenir pour répéter), métronomes et royalties, ajouter un bébé, étage suivant, tuer les ennemis ; carte entière visible et téléportation partout |
+| F2 | Menu de debug : attributs du joueur modifiables à la souris (− / +, maintenir pour répéter), métronomes, royalties et arme, ajouter un bébé, étage suivant, tuer les ennemis, donner un objet ; carte entière visible et téléportation partout |
 | F11 | Plein écran |
 | Échap | Quitter |
 

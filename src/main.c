@@ -78,9 +78,11 @@ static void render(App *app, float alpha)
                                   g->floor_number, (unsigned long long)g->floor.seed, g->room.index + 1,
                                   g->floor.room_count, floor_shape_name(fr->shape), fr->babies, fr->depth,
                                   kinds[fr->kind]);
-        char owned[64] = "";
+        char owned[128] = "";
         for (int i = 0; i < ITEM_COUNT; i++) {
-            if (g->owned[i]) SDL_strlcat(owned, (const char *[]){ " Lully", " Haydn", " Satie", " Guido", " Sabots" }[i], sizeof owned);
+            static const char *short_names[ITEM_COUNT] = { " Lully", " Haydn", " Satie", " Guido", " Sabots",
+                                                           " c", " a", " x", " Liquescence", " Trope" };
+            if (g->owned[i]) SDL_strlcat(owned, short_names[i], sizeof owned);
         }
         SDL_RenderDebugTextFormat(r, 8, GAME_H - 42, "objets :%s", owned[0] ? owned : " aucun");
         SDL_RenderDebugTextFormat(r, 8, GAME_H - 30, "FPS %.0f  notes %d  ennemis %d  prix %d  metronomes poses %d  briques %d  morts %d",
@@ -181,6 +183,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     case DEBUG_ACTION_SPAWN_BABY:    game_spawn_baby(&app->game); break;
     case DEBUG_ACTION_NEW_FLOOR:     game_next_floor(&app->game, random_seed()); break;
     case DEBUG_ACTION_KILL_ENEMIES:  game_kill_enemies(&app->game); break;
+    case DEBUG_ACTION_GIVE_ITEM:     game_give_next_item(&app->game); break;
     default: break;
     }
     return SDL_APP_CONTINUE;

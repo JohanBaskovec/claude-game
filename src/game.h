@@ -15,6 +15,7 @@
 #include "player.h"
 #include "projectile.h"
 #include "room.h"
+#include "weapon.h"
 
 /* Glissement de l'écran d'une salle à l'autre (GDD §12). */
 typedef struct Transition {
@@ -43,6 +44,7 @@ typedef struct Game {
     int            floor_number;          /* 1 = premier étage */
     bool           owned[ITEM_COUNT];     /* objets pris pendant la partie */
     bool           trapdoor_armed;        /* la trappe ne marche qu'après en être sorti une fois */
+    bool           socle_armed;           /* idem pour le socle d'arme (sinon on échangerait en boucle) */
     float          shake_timer;           /* tremblement de l'écran, s */
     float          time;                  /* s de jeu, pour les animations */
 
@@ -71,6 +73,9 @@ bool game_can_teleport(const Game *g, int room);
 bool game_teleport(Game *g, int room, int cx, int cy);
 
 void game_spawn_baby(Game *g);
+
+/* Debug : donne le prochain objet passif pas encore pris. */
+void game_give_next_item(Game *g);
 void game_kill_enemies(Game *g);
 
 /* Caméra de la salle courante (alpha : interpolation du rendu). */

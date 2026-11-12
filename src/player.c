@@ -15,6 +15,7 @@ PlayerStats player_start_stats(void)
         .shot_range = tuning.start_shot_range,
         .bombs      = tuning.start_bombs,
         .coins      = tuning.start_coins,
+        .weapon     = WEAPON_VOICE,
     };
 }
 
@@ -32,6 +33,10 @@ void player_init(Player *p, float center_x, float center_y)
     p->fire_cooldown = 0.0f;
     p->sing_timer = 0.0f;
     p->invuln_timer = 0.0f;
+    p->charge = 0.0f;
+    p->charging = false;
+    p->charge_dir = DIR_NONE;
+    p->lock_timer = 0.0f;
 }
 
 /* Rapproche v de target, avec une constante de temps (0 = immédiat). */
@@ -44,18 +49,25 @@ static float approach(float v, float target, float time_constant, float dt)
     return v + (target - v) * k;
 }
 
-Dir player_update(Player *p, const Input *in, const Room *room, float dt)
+PlayerFire player_update(Player *p, const Input *in, const Room *room, float fire_rate, float charge_time, float dt)
 {
     p->prev_x = p->box.x;
     p->prev_y = p->box.y;
 
+    /* Cloué sur place (orgue) : les commandes de déplacement sont ignorées. */
+    float mx = in->move_x, my = in->move_y;
+    if (p->lock_timer > 0.0f) {
+        p->lock_timer -= dt;
+        mx = my = 0.0f;
+    }
+
     /* Déplacement avec accélération / freinage. */
-    bool moving = in->move_x != 0.0f || in->move_y != 0.0f;
+    bool moving = mx != 0.0f || my != 0.0f;
     float tc = moving ? tuning.player_accel_time : tuning.player_decel_time;
-    p->vx = approach(p->vx, in->move_x * p->stats.speed, tc, dt);
-    p->vy = approach(p->vy, in->move_y * p->stats.speed, tc, dt);
-    if (fabsf(p->vx) < 1.0f && in->move_x == 0.0f) p->vx = 0.0f;
-    if (fabsf(p->vy) < 1.0f && in->move_y == 0.0f) p->vy = 0.0f;
+    p->vx = approach(p->vx, mx * p->stats.speed, tc, dt);
+    p->vy = approach(p->vy, my * p->stats.speed, tc, dt);
+    if (fabsf(p->vx) < 1.0f && mx == 0.0f) p->vx = 0.0f;
+    if (fabsf(p->vy) < 1.0f && my == 0.0f) p->vy = 0.0f;
 
     int blocked = room_move_box(room, &p->box, p->vx * dt, p->vy * dt);
     /* Contre un mur, la vitesse sur cet axe tombe à zéro. */
@@ -66,27 +78,50 @@ Dir player_update(Player *p, const Input *in, const Room *room, float dt)
     if (in->shoot != DIR_NONE) {
         p->look = in->shoot;
     } else if (moving) {
-        if (fabsf(in->move_x) > fabsf(in->move_y)) {
-            p->look = in->move_x > 0.0f ? DIR_RIGHT : DIR_LEFT;
+        if (fabsf(mx) > fabsf(my)) {
+            p->look = mx > 0.0f ? DIR_RIGHT : DIR_LEFT;
         } else {
-            p->look = in->move_y > 0.0f ? DIR_DOWN : DIR_UP;
+            p->look = my > 0.0f ? DIR_DOWN : DIR_UP;
         }
     }
 
-    /* Cadence de tir. */
     if (p->sing_timer > 0.0f) {
         p->sing_timer -= dt;
     }
     if (p->invuln_timer > 0.0f) {
         p->invuln_timer -= dt;
     }
-    Dir fired = DIR_NONE;
-    /* Petite tolérance : évite qu'une erreur d'arrondi décale un tir d'une image. */
+
+    PlayerFire fired = { DIR_NONE, 1.0f };
+
+    /* Arme à charger : on charge en tenant une flèche, le tir part au relâchement. */
+    if (charge_time > 0.0f) {
+        if (in->shoot != DIR_NONE) {
+            if (p->fire_cooldown <= 1e-4f) {
+                p->charging = true;
+                p->charge = SDL_min(p->charge + dt / charge_time, 1.0f);
+                p->charge_dir = in->shoot;
+            }
+        } else if (p->charging) {
+            fired.dir = p->charge_dir;
+            fired.charge = p->charge;
+            p->charging = false;
+            p->charge = 0.0f;
+            p->fire_cooldown = tuning.flute_recover;
+            p->sing_timer = tuning.sing_duration;
+        }
+        p->fire_cooldown = SDL_max(p->fire_cooldown - dt, 0.0f);
+        return fired;
+    }
+    p->charging = false;
+    p->charge = 0.0f;
+
+    /* Cadence de tir. Petite tolérance : évite qu'une erreur d'arrondi décale un tir d'une image. */
     if (in->shoot != DIR_NONE && p->fire_cooldown <= 1e-4f) {
         /* += plutôt que = : la cadence reste exacte quel que soit le pas. */
-        p->fire_cooldown += 1.0f / p->stats.fire_rate;
+        p->fire_cooldown += 1.0f / fire_rate;
         p->sing_timer = tuning.sing_duration;
-        fired = in->shoot;
+        fired.dir = in->shoot;
     }
     p->fire_cooldown -= dt;
     if (p->fire_cooldown < 0.0f && (in->shoot == DIR_NONE || p->fire_cooldown < -dt)) {
@@ -160,6 +195,13 @@ void player_render(const Player *p, SDL_Renderer *renderer, float alpha, Camera 
     fill(renderer, hx + 2.0f, hy - 4.0f, 38.0f, 5.0f, 255, 70, 168);
     fill(renderer, hx - 5.0f, hy + 12.0f, 8.0f, 16.0f, 255, 70, 168);
     fill(renderer, hx + 39.0f, hy + 12.0f, 8.0f, 16.0f, 255, 70, 168);
+
+    /* Jauge de charge (flûte) au-dessus de la tête. */
+    if (p->charging && p->charge > 0.0f) {
+        fill(renderer, cx - 17.0f, hy - 14.0f, 34.0f, 6.0f, 30, 20, 20);
+        bool full = p->charge >= 1.0f;
+        fill(renderer, cx - 16.0f, hy - 13.0f, 32.0f * p->charge, 4.0f, full ? 255 : 240, full ? 230 : 160, full ? 120 : 60);
+    }
 
     /* Visage selon la direction du regard */
     if (p->look == DIR_UP) {

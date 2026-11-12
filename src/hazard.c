@@ -15,17 +15,46 @@ Hazard *hazard_spawn_brick(HazardPool *pool, float x, float y, float fall_time)
     for (int i = 0; i < MAX_HAZARDS; i++) {
         Hazard *h = &pool->items[i];
         if (!h->active) {
-            *h = (Hazard){ .active = true, .x = x, .y = y, .fall_time = SDL_max(fall_time, 0.05f) };
+            *h = (Hazard){ .active = true, .type = HAZARD_BRICK, .x = x, .y = y, .fall_time = SDL_max(fall_time, 0.05f) };
             return h;
         }
     }
     return NULL;
 }
 
+Hazard *hazard_spawn_ink(HazardPool *pool, float x, float y)
+{
+    for (int i = 0; i < MAX_HAZARDS; i++) {
+        Hazard *h = &pool->items[i];
+        if (!h->active) {
+            *h = (Hazard){ .active = true, .type = HAZARD_INK, .landed = true, .x = x, .y = y };
+            return h;
+        }
+    }
+    return NULL;
+}
+
+bool hazard_in_ink(const HazardPool *pool, float x, float y)
+{
+    float r = tuning.ink_radius;
+    for (int i = 0; i < MAX_HAZARDS; i++) {
+        const Hazard *h = &pool->items[i];
+        if (!h->active || h->type != HAZARD_INK) continue;
+        /* Flaque vue en perspective : ellipse deux fois plus large que haute. */
+        float dx = (x - h->x) / r, dy = (y - h->y) / (r * 0.5f);
+        if (dx * dx + dy * dy <= 1.0f) return true;
+    }
+    return false;
+}
+
 bool hazard_update(Hazard *h, float dt)
 {
     if (!h->active) return false;
     h->timer += dt;
+    if (h->type == HAZARD_INK) {
+        if (h->timer >= tuning.ink_time) h->active = false;
+        return false;
+    }
     if (h->landed) {
         if (h->timer >= RUBBLE_TIME) h->active = false;
         return false;
@@ -50,6 +79,14 @@ void hazard_render_ground(const Hazard *h, SDL_Renderer *r, Camera cam)
 {
     if (!h->active) return;
     float x = h->x - cam.x, y = h->y - cam.y;
+    if (h->type == HAZARD_INK) {
+        /* La flaque apparaît vite et s'efface à la fin. */
+        float u = SDL_min(h->timer / 0.1f, 1.0f) * SDL_clamp((tuning.ink_time - h->timer) / 0.5f, 0.0f, 1.0f);
+        float ir = tuning.ink_radius * (0.6f + 0.4f * SDL_min(h->timer / 0.1f, 1.0f));
+        draw_ellipse(r, x, y, ir, ir * 0.5f, (SDL_Color){ 26, 30, 64, (Uint8)(200.0f * u) });
+        draw_ellipse(r, x - ir * 0.3f, y - ir * 0.1f, ir * 0.25f, ir * 0.1f, (SDL_Color){ 90, 100, 150, (Uint8)(120.0f * u) });
+        return;
+    }
     float rad = tuning.brick_radius;
     if (!h->landed) {
         /* L'ombre grandit et fonce à l'approche de l'impact. */
@@ -68,7 +105,7 @@ void hazard_render_ground(const Hazard *h, SDL_Renderer *r, Camera cam)
 
 void hazard_render_air(const Hazard *h, SDL_Renderer *r, Camera cam)
 {
-    if (!h->active || h->landed) return;
+    if (!h->active || h->landed || h->type != HAZARD_BRICK) return;
     float left = h->fall_time - h->timer;
     if (left > VISIBLE_FALL) return;
     float u = left / VISIBLE_FALL;   /* 1 en haut, 0 à l'impact */

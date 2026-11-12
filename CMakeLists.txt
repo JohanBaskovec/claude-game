@@ -56,6 +56,7 @@ add_executable(fugue
     src/projectile.c
     src/room.c
     src/text.c
+    src/weapon.c
 )
 
 target_link_libraries(fugue PRIVATE SDL3::SDL3)

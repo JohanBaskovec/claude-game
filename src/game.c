@@ -51,6 +51,25 @@ void game_kill_enemies(Game *g)
     enemy_pool_clear(&g->enemies);
 }
 
+/* Joueur sur un meuble (téléportation, meubles qui apparaissent) ou trop près pour ne pas
+ * prendre son objet sans le vouloir : on le déplace jusqu'à un endroit dégagé, en dessous,
+ * ou au-dessus si on bute sur le mur du bas. */
+static void free_player_from_props(Game *g)
+{
+    float cx, cy;
+    player_center(&g->player, &cx, &cy);
+    for (int i = 0; i < 80; i++) {
+        float y = cy + (i < 40 ? 8.0f * (float)i : -8.0f * (float)(i - 40));
+        place_player(g, cx, y);
+        SDL_FRect margin = { g->player.box.x - 24.0f, g->player.box.y - 24.0f,
+                             g->player.box.w + 48.0f, g->player.box.h + 48.0f };
+        bool blocked = false;
+        for (int k = 0; k < g->room.prop_count; k++) blocked |= overlaps(&margin, &g->room.props[k]);
+        if (!blocked && !room_overlaps_wall(&g->room, &g->player.box)) return;
+    }
+    place_player(g, cx, cy);
+}
+
 static void collect(Game *g, PickupType type)
 {
     PlayerStats *st = &g->player.stats;
@@ -70,23 +89,14 @@ static void enter_room(Game *g, int index, float entry_x, float entry_y)
     FloorRoom *fr = &g->floor.rooms[index];
     room_build(&g->room, &g->floor, index);
     place_player(g, entry_x, entry_y);
-    /* Téléporté sur un lutrin (ou trop près pour ne pas prendre son objet sans le vouloir) :
-     * on descend jusqu'à un endroit dégagé. */
-    for (int i = 0; i < 40; i++) {
-        SDL_FRect margin = { g->player.box.x - 24.0f, g->player.box.y - 24.0f,
-                             g->player.box.w + 48.0f, g->player.box.h + 48.0f };
-        bool blocked = false;
-        for (int k = 0; k < g->room.prop_count; k++) blocked |= overlaps(&margin, &g->room.props[k]);
-        if (!blocked && !room_overlaps_wall(&g->room, &g->player.box)) break;
-        entry_y += 8.0f;
-        place_player(g, entry_x, entry_y);
-    }
+    free_player_from_props(g);
     projectile_pool_clear(&g->shots);
     enemy_pool_clear(&g->enemies);
     pickup_pool_clear(&g->pickups);
     bomb_pool_clear(&g->bombs);
     hazard_pool_clear(&g->hazards);
     g->trapdoor_armed = false;
+    g->socle_armed = false;
     g->shake_timer = 0.0f;
 
     fr->visited = true;
@@ -105,31 +115,42 @@ static void enter_room(Game *g, int index, float entry_x, float entry_y)
     room_set_doors_open(&g->room, empty, &g->player.box);
 }
 
-/* Objets de la salle du trésor : tirés avec la graine de l'étage, parmi ceux pas encore pris. */
-static void fill_treasure(Game *g)
+/* Tire `n` valeurs différentes dans pool[0..*count[ et les retire du tas. -1 quand il est vide. */
+static int draw_from(int *pool, int *count, Uint64 *rng)
 {
-    if (g->floor.treasure < 0) return;
+    if (*count == 0) return -1;
+    int j = SDL_rand_r(rng, *count);
+    int v = pool[j];
+    pool[j] = pool[--*count];
+    return v;
+}
+
+/* Objets et armes du trésor et de la salle du boss : tirés avec la graine de l'étage,
+ * parmi les objets pas encore pris et les armes autres que celle qu'on tient.
+ * Les deux salles ne proposent jamais la même chose. */
+static void fill_offers(Game *g)
+{
     Uint64 rng = g->floor.seed * 0x9E3779B97F4A7C15ull + 0x5EED;
-    int pool[ITEM_COUNT], n = 0;
+    int items[ITEM_COUNT], ni = 0, weapons[WEAPON_COUNT], nw = 0;
     for (int i = 0; i < ITEM_COUNT; i++) {
-        if (!g->owned[i]) pool[n++] = i;
+        if (!g->owned[i]) items[ni++] = i;
     }
-    FloorRoom *fr = &g->floor.rooms[g->floor.treasure];
-    for (int k = 0; k < TREASURE_OFFERS; k++) {
-        if (n == 0) {
-            fr->offers[k] = ITEM_NONE;
-            continue;
-        }
-        int j = SDL_rand_r(&rng, n);
-        fr->offers[k] = pool[j];
-        pool[j] = pool[--n];
+    for (int w = 0; w < WEAPON_COUNT; w++) {
+        if (w != WEAPON_VOICE && w != g->player.stats.weapon) weapons[nw++] = w;
+    }
+    int rooms[2] = { g->floor.treasure, g->floor.boss };
+    for (int k = 0; k < 2; k++) {
+        if (rooms[k] < 0) continue;
+        FloorRoom *fr = &g->floor.rooms[rooms[k]];
+        for (int i = 0; i < TREASURE_OFFERS; i++) fr->offers[i] = draw_from(items, &ni, &rng);
+        fr->weapon_offer = draw_from(weapons, &nw, &rng);
     }
 }
 
 static void start_floor(Game *g, Uint64 seed)
 {
     floor_generate(&g->floor, seed);
-    fill_treasure(g);
+    fill_offers(g);
     pickup_pool_clear(&g->pickups);
     Room start;
     room_build(&start, &g->floor, g->floor.start);
@@ -214,46 +235,108 @@ bool game_teleport(Game *g, int room, int cx, int cy)
     return true;
 }
 
-static void fire(Game *g, Dir dir)
+static void fire(Game *g, PlayerFire f)
 {
+    Player *p = &g->player;
     /* Bâton de Lully : de temps en temps, le coup part dans le pied. */
     if (g->owned[ITEM_LULLY] && tuning.item_lully_foot_chance > 0 && SDL_rand(tuning.item_lully_foot_chance) == 0) {
-        player_hurt(&g->player, tuning.item_lully_foot_damage);
+        player_hurt(p, tuning.item_lully_foot_damage);
         return;
     }
 
     float dx, dy, cx, cy;
-    dir_vector(dir, &dx, &dy);
-    player_center(&g->player, &cx, &cy);
+    dir_vector(f.dir, &dx, &dy);
+    player_center(p, &cx, &cy);
+    ShotSpec s = weapon_shot(&p->stats, g->owned, f.charge);
+    if (tuning.weapons[p->stats.weapon].lock_time > 0.0f) {
+        p->lock_timer = SDL_max(p->lock_timer, tuning.weapons[p->stats.weapon].lock_time);
+        p->vx = p->vy = 0.0f;   /* cloué net, sans glisser */
+    }
 
-    const PlayerStats *st = &g->player.stats;
-    float vx = dx * st->shot_speed + g->player.vx * tuning.shot_inherit;
-    float vy = dy * st->shot_speed + g->player.vy * tuning.shot_inherit;
-    projectile_spawn(&g->shots, cx + dx * 8.0f, cy + dy * 8.0f, vx, vy, st->shot_range, st->damage);
+    if (s.kind == SHOT_RING) {
+        Projectile *pr = projectile_spawn_ring(&g->shots, cx, cy, s.range, s.damage);
+        if (pr) pr->stun = s.stun;
+        return;
+    }
+    if (s.kind == SHOT_BEAM) {
+        Projectile *pr = projectile_spawn_beam(&g->shots, &g->room, cx, cy, dx, dy, s.damage);
+        if (pr) pr->stun = s.stun;
+        return;
+    }
+
+    /* Notes et ondes : en éventail autour de la direction du tir. */
+    float base = atan2f(dy, dx);
+    float step = s.count > 1 ? s.spread / (float)(s.count - 1) : 0.0f;
+    for (int i = 0; i < s.count; i++) {
+        float a = base + ((float)i - (float)(s.count - 1) * 0.5f) * step;
+        float ux = cosf(a), uy = sinf(a);
+        float vx = ux * s.speed + p->vx * tuning.shot_inherit;
+        float vy = uy * s.speed + p->vy * tuning.shot_inherit;
+        Projectile *pr = projectile_spawn(&g->shots, cx + ux * 8.0f, cy + uy * 8.0f, vx, vy, s.range, s.damage);
+        if (!pr) break;
+        pr->kind = s.kind;
+        pr->size = s.size;
+        pr->stun = s.stun;
+        pr->spectral = s.spectral;
+        pr->pause = s.pause;
+        pr->ink = s.ink;
+    }
 }
 
-static SDL_FRect shot_box(const Projectile *pr)
+/* Flaque d'encre ramenée sur le sol (une note arrêtée par un mur finit dans le mur). */
+static void drop_ink(Game *g, float x, float y)
 {
-    float s = tuning.shot_size;
-    return (SDL_FRect){ pr->x - s * 0.5f, pr->y - s * 0.5f, s, s };
+    float mx = tuning.ink_radius + 2.0f, my = tuning.ink_radius * 0.5f + 2.0f, best = 1e18f, bx = x, by = y;
+    for (int i = 0; i < g->room.cell_count; i++) {
+        const SDL_FRect *c = &g->room.cells[i];
+        float cx = SDL_clamp(x, c->x + mx, c->x + c->w - mx), cy = SDL_clamp(y, c->y + my, c->y + c->h - my);
+        float d = (cx - x) * (cx - x) + (cy - y) * (cy - y);
+        if (d < best) {
+            best = d;
+            bx = cx;
+            by = cy;
+        }
+    }
+    hazard_spawn_ink(&g->hazards, bx, by);
 }
 
-/* Notes contre ennemis : la note disparaît, l'ennemi perd des PV et recule. */
+/* Tirs contre ennemis. Une note disparaît au premier ennemi touché ; les ondes et le rayon
+ * traversent et touchent chaque ennemi une seule fois. */
 static void resolve_shots_vs_enemies(Game *g)
 {
     for (int i = 0; i < MAX_PROJECTILES; i++) {
         Projectile *pr = &g->shots.items[i];
         if (!pr->active) continue;
-        SDL_FRect sb = shot_box(pr);
         for (int j = 0; j < MAX_ENEMIES; j++) {
             Enemy *e = &g->enemies.items[j];
-            if (!enemy_tangible(e) || !overlaps(&sb, &e->box)) continue;
-            float len = sqrtf(pr->vx * pr->vx + pr->vy * pr->vy);
-            float kx = len > 0.0f ? pr->vx / len : 0.0f;
-            float ky = len > 0.0f ? pr->vy / len : 0.0f;
+            Uint32 bit = (Uint32)1 << j;
+            if (!enemy_tangible(e) || (pr->hits & bit) || !projectile_hits_box(pr, &e->box)) continue;
+
+            /* Poussée dans le sens du tir (vers l'extérieur pour la cloche). */
+            float kx = pr->dir_x, ky = pr->dir_y;
+            if (pr->kind == SHOT_RING) {
+                float ex = e->box.x + e->box.w * 0.5f - pr->x, ey = e->box.y + e->box.h * 0.5f - pr->y;
+                float len = sqrtf(ex * ex + ey * ey);
+                kx = len > 0.0f ? ex / len : 0.0f;
+                ky = len > 0.0f ? ey / len : 1.0f;
+            }
+            if (pr->stun > 0.0f) enemy_stun(e, pr->stun);
             enemy_hurt(e, pr->damage, kx * tuning.shot_knockback, ky * tuning.shot_knockback);
+            if (projectile_pierces(pr)) {
+                pr->hits |= bit;
+                continue;
+            }
             pr->active = false;
+            if (pr->ink) drop_ink(g, pr->x, pr->y);
             break;
+        }
+    }
+    /* Notes arrêtées par un mur ou au bout de leur portée. */
+    for (int i = 0; i < MAX_PROJECTILES; i++) {
+        Projectile *pr = &g->shots.items[i];
+        if (pr->ink_drop) {
+            drop_ink(g, pr->x, pr->y);
+            pr->ink_drop = false;
         }
     }
 }
@@ -317,22 +400,53 @@ static void take_item(Game *g, ItemId id)
     hud_show_banner(&g->hud, item_name(id), item_desc(id));
 }
 
-/* Salle du trésor : toucher un lutrin prend son objet, les autres disparaissent. */
-static void resolve_treasure(Game *g)
+static void take_weapon(Game *g, FloorRoom *fr)
+{
+    Player *p = &g->player;
+    int old = p->stats.weapon;
+    p->stats.weapon = fr->weapon_offer;
+    fr->weapon_offer = old;            /* l'ancienne arme reste sur le socle */
+    p->charge = 0.0f;
+    p->charging = false;
+    p->fire_cooldown = 0.0f;
+    hud_show_banner(&g->hud, weapon_name(p->stats.weapon), weapon_desc(p->stats.weapon));
+}
+
+/* Lutrins : en toucher un prend son objet, les autres disparaissent.
+ * Socle d'arme : le toucher échange les armes ; il faut s'en éloigner avant de recommencer. */
+static void resolve_offers(Game *g)
 {
     FloorRoom *fr = &g->floor.rooms[g->room.index];
-    if (fr->kind != ROOM_TREASURE) return;
+    bool on_socle = false;
     for (int i = 0; i < g->room.prop_count; i++) {
-        if (fr->offers[i] < 0) continue;
         SDL_FRect reach = g->room.props[i];
         reach.x -= 6.0f;
         reach.y -= 6.0f;
         reach.w += 12.0f;
         reach.h += 12.0f;
         if (!overlaps(&reach, &g->player.box)) continue;
-        take_item(g, (ItemId)fr->offers[i]);
-        for (int k = 0; k < TREASURE_OFFERS; k++) fr->offers[k] = ITEM_NONE;
-        return;
+
+        if (g->room.prop_kind[i] == PROP_WEAPON) {
+            on_socle = true;
+            if (g->socle_armed && fr->weapon_offer >= 0) {
+                take_weapon(g, fr);
+                g->socle_armed = false;
+            }
+        } else if (i < TREASURE_OFFERS && fr->offers[i] >= 0) {
+            take_item(g, (ItemId)fr->offers[i]);
+            for (int k = 0; k < TREASURE_OFFERS; k++) fr->offers[k] = ITEM_NONE;
+        }
+    }
+    if (!on_socle) g->socle_armed = true;
+}
+
+void game_give_next_item(Game *g)
+{
+    for (int i = 0; i < ITEM_COUNT; i++) {
+        if (!g->owned[i]) {
+            take_item(g, (ItemId)i);
+            return;
+        }
     }
 }
 
@@ -342,7 +456,10 @@ static void room_cleared(Game *g)
     FloorRoom *fr = &g->floor.rooms[g->room.index];
     if (fr->kind == ROOM_BOSS) {
         room_open_trapdoor(&g->room);
+        room_place_offers(&g->room, true);
+        free_player_from_props(g);
         g->trapdoor_armed = false;
+        g->socle_armed = false;
     }
     if (SDL_randf() < tuning.reward_chance) {
         float x, y;
@@ -365,7 +482,8 @@ void game_step(Game *g, const Input *in, float dt)
         return;
     }
 
-    Dir shot = player_update(&g->player, in, &g->room, dt);
+    PlayerFire shot = player_update(&g->player, in, &g->room, weapon_fire_rate(&g->player.stats),
+                                    weapon_charge_time(&g->player.stats), dt);
     float px, py;
     player_center(&g->player, &px, &py);
 
@@ -394,18 +512,27 @@ void game_step(Game *g, const Input *in, float dt)
     }
     for (int i = 0; i < MAX_HAZARDS; i++) {
         Hazard *h = &g->hazards.items[i];
-        if (hazard_update(h, dt)) {
+        if (hazard_update(h, dt) && h->type == HAZARD_BRICK) {
             float d2 = (px - h->x) * (px - h->x) + (py - h->y) * (py - h->y);
             if (d2 <= tuning.brick_radius * tuning.brick_radius) player_hurt(&g->player, tuning.brick_damage);
         }
     }
 
+    /* Encre : les ennemis qui marchent dedans sont ralentis. */
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        Enemy *e = &g->enemies.items[i];
+        if (enemy_tangible(e) && hazard_in_ink(&g->hazards, e->box.x + e->box.w * 0.5f, e->box.y + e->box.h)) {
+            enemy_slow(e, 0.15f);
+        }
+    }
+
     resolve_shots_vs_enemies(g);
     resolve_enemies_vs_player(g);
-    if (shot != DIR_NONE) {
+    if (shot.dir != DIR_NONE) {
         fire(g, shot);
+        resolve_shots_vs_enemies(g);   /* la cloche et l'orgue frappent dès le tir */
     }
-    resolve_treasure(g);
+    resolve_offers(g);
 
     if (g->player.stats.hp <= 0) {
         g->deaths++;
@@ -464,14 +591,18 @@ static void push_item(DrawItem *items, int *n, float y, DrawKind kind, int index
     items[k] = (DrawItem){ y, kind, index };
 }
 
-static void render_lutrin(const Game *g, SDL_Renderer *r, int i, Camera cam)
+static void render_prop(const Game *g, SDL_Renderer *r, int i, Camera cam)
 {
-    room_render_lutrin(&g->room, i, r, cam);
+    room_render_prop(&g->room, i, r, cam);
     const FloorRoom *fr = &g->floor.rooms[g->room.index];
-    if (fr->kind != ROOM_TREASURE || fr->offers[i] < 0) return;
     const SDL_FRect *p = &g->room.props[i];
     float bob = sinf(g->time * 3.0f + (float)i) * 3.0f;
-    item_render((ItemId)fr->offers[i], r, p->x + p->w * 0.5f - cam.x, p->y + p->h - 98.0f + bob - cam.y);
+    float x = p->x + p->w * 0.5f - cam.x;
+    if (g->room.prop_kind[i] == PROP_WEAPON) {
+        if (fr->weapon_offer >= 0) weapon_render_icon((WeaponId)fr->weapon_offer, r, x, p->y + p->h - 62.0f + bob - cam.y, 1.0f);
+    } else if (i < TREASURE_OFFERS && fr->offers[i] >= 0) {
+        item_render((ItemId)fr->offers[i], r, x, p->y + p->h - 98.0f + bob - cam.y);
+    }
 }
 
 /* La salle courante et ses occupants, vus par la caméra `cam`. */
@@ -506,7 +637,7 @@ static void render_room_contents(const Game *g, SDL_Renderer *r, float alpha, Ca
         switch (items[k].kind) {
         case DRAW_PLAYER: player_render(p, r, alpha, cam); break;
         case DRAW_ENEMY:  enemy_render(&g->enemies.items[i], r, alpha, cam); break;
-        case DRAW_LUTRIN: render_lutrin(g, r, i, cam); break;
+        case DRAW_LUTRIN: render_prop(g, r, i, cam); break;
         case DRAW_BOMB:   bomb_render(&g->bombs.items[i], r, cam); break;
         case DRAW_PICKUP: pickup_render(&g->pickups.items[i], r, alpha, cam); break;
         }
@@ -538,7 +669,7 @@ void game_render(const Game *g, SDL_Renderer *r, float alpha)
         Camera old_cam = { t->from_cam.x + sx * e, t->from_cam.y + sy * e };
         Camera new_cam = { cam.x - sx * (1.0f - e), cam.y - sy * (1.0f - e) };
         room_render(&t->from, r, old_cam);
-        for (int i = 0; i < t->from.prop_count; i++) room_render_lutrin(&t->from, i, r, old_cam);
+        for (int i = 0; i < t->from.prop_count; i++) room_render_prop(&t->from, i, r, old_cam);
         render_room_contents(g, r, alpha, new_cam);
     } else {
         render_room_contents(g, r, alpha, cam);

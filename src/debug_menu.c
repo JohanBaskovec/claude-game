@@ -17,6 +17,7 @@ typedef enum StatKind { STAT_INT, STAT_FLOAT } StatKind;
 typedef struct StatRow {
     const char *label;
     const char *unit;
+    const char *const *names;   /* valeur affichée par son nom (liste), ou NULL */
     StatKind    kind;
     size_t      offset;    /* position du champ dans PlayerStats */
     float       step;      /* pas d'un clic */
@@ -24,16 +25,19 @@ typedef struct StatRow {
     int         decimals;
 } StatRow;
 
+static const char *const WEAPON_NAMES[WEAPON_COUNT] = { "Voix", "Olifant", "Flute", "Lyre", "Tabourin", "Cloche", "Orgue" };
+
 static const StatRow ROWS[] = {
-    { "Points de vie",    "PV",      STAT_INT,   offsetof(PlayerStats, hp),         1.0f,  0.0f,  MAX_IS_MAX_HP, 0 },
-    { "PV maximum",       "PV",      STAT_INT,   offsetof(PlayerStats, max_hp),     1.0f,  1.0f,  MAX_IS_HP_CAP, 0 },
-    { "Vitesse",          "px/s",    STAT_FLOAT, offsetof(PlayerStats, speed),      10.0f, 30.0f, 1000.0f, 0 },
-    { "Cadence de tir",   "notes/s", STAT_FLOAT, offsetof(PlayerStats, fire_rate),  0.25f, 0.25f, 30.0f,   2 },
-    { "Degats",           "PV",      STAT_FLOAT, offsetof(PlayerStats, damage),     0.5f,  0.5f,  50.0f,   1 },
-    { "Vitesse des tirs", "px/s",    STAT_FLOAT, offsetof(PlayerStats, shot_speed), 20.0f, 60.0f, 2000.0f, 0 },
-    { "Portee des tirs",  "px",      STAT_FLOAT, offsetof(PlayerStats, shot_range), 20.0f, 20.0f, 2000.0f, 0 },
-    { "Metronomes",       "",        STAT_INT,   offsetof(PlayerStats, bombs),      1.0f,  0.0f,  99.0f,   0 },
-    { "Royalties",        "",        STAT_INT,   offsetof(PlayerStats, coins),      1.0f,  0.0f,  99.0f,   0 },
+    { "Points de vie",    "PV", NULL,      STAT_INT,   offsetof(PlayerStats, hp),         1.0f,  0.0f,  MAX_IS_MAX_HP, 0 },
+    { "PV maximum",       "PV", NULL,      STAT_INT,   offsetof(PlayerStats, max_hp),     1.0f,  1.0f,  MAX_IS_HP_CAP, 0 },
+    { "Vitesse",          "px/s", NULL,    STAT_FLOAT, offsetof(PlayerStats, speed),      10.0f, 30.0f, 1000.0f, 0 },
+    { "Cadence de tir",   "notes/s", NULL, STAT_FLOAT, offsetof(PlayerStats, fire_rate),  0.25f, 0.25f, 30.0f,   2 },
+    { "Degats",           "PV", NULL,      STAT_FLOAT, offsetof(PlayerStats, damage),     0.5f,  0.5f,  50.0f,   1 },
+    { "Vitesse des tirs", "px/s", NULL,    STAT_FLOAT, offsetof(PlayerStats, shot_speed), 20.0f, 60.0f, 2000.0f, 0 },
+    { "Portee des tirs",  "px", NULL,      STAT_FLOAT, offsetof(PlayerStats, shot_range), 20.0f, 20.0f, 2000.0f, 0 },
+    { "Metronomes",       "", NULL,        STAT_INT,   offsetof(PlayerStats, bombs),      1.0f,  0.0f,  99.0f,   0 },
+    { "Royalties",        "", NULL,        STAT_INT,   offsetof(PlayerStats, coins),      1.0f,  0.0f,  99.0f,   0 },
+    { "Arme",             "", WEAPON_NAMES, STAT_INT,  offsetof(PlayerStats, weapon),     1.0f,  0.0f,  WEAPON_COUNT - 1, 0 },
 };
 #define ROW_COUNT ((int)(sizeof(ROWS) / sizeof(ROWS[0])))
 
@@ -42,7 +46,8 @@ static const StatRow ROWS[] = {
 #define BTN_BABY  (ROW_COUNT * 2 + 1)
 #define BTN_FLOOR (ROW_COUNT * 2 + 2)
 #define BTN_KILL  (ROW_COUNT * 2 + 3)
-#define BTN_COUNT (ROW_COUNT * 2 + 4)
+#define BTN_ITEM  (ROW_COUNT * 2 + 4)
+#define BTN_COUNT (ROW_COUNT * 2 + 5)
 
 /* Mise en page, en pixels du jeu. La police de debug fait 8x8 px. */
 #define GLYPH     8.0f
@@ -60,7 +65,8 @@ static const StatRow ROWS[] = {
 #define RESET_W   142.0f
 #define BABY_W    142.0f
 #define ACTION2_Y (RESET_Y + BTN_H + 6.0f)
-#define PANEL_H   (ACTION2_Y + BTN_H + 10.0f - PANEL_Y)
+#define ACTION3_Y (ACTION2_Y + BTN_H + 6.0f)
+#define PANEL_H   (ACTION3_Y + BTN_H + 10.0f - PANEL_Y)
 
 #define REPEAT_DELAY 0.40f  /* s avant la répétition automatique */
 #define REPEAT_EVERY 0.06f  /* s entre deux répétitions */
@@ -69,6 +75,7 @@ static const char *RESET_LABEL = "Valeurs de depart";
 static const char *BABY_LABEL  = "Ajouter un bebe";
 static const char *FLOOR_LABEL = "Etage suivant";
 static const char *KILL_LABEL  = "Tuer les ennemis";
+static const char *ITEM_LABEL  = "Donner un objet";
 
 static SDL_FRect button_rect(int id)
 {
@@ -83,6 +90,9 @@ static SDL_FRect button_rect(int id)
     }
     if (id == BTN_KILL) {
         return (SDL_FRect){ PANEL_X + PANEL_W - 10.0f - BABY_W, ACTION2_Y, BABY_W, BTN_H };
+    }
+    if (id == BTN_ITEM) {
+        return (SDL_FRect){ PANEL_X + 10.0f, ACTION3_Y, RESET_W, BTN_H };
     }
     int row = id / 2;
     float y = ROWS_Y + (float)row * ROW_H;
@@ -153,6 +163,7 @@ static DebugAction press(int id, PlayerStats *st)
     if (id == BTN_BABY)  return DEBUG_ACTION_SPAWN_BABY;
     if (id == BTN_FLOOR) return DEBUG_ACTION_NEW_FLOOR;
     if (id == BTN_KILL)  return DEBUG_ACTION_KILL_ENEMIES;
+    if (id == BTN_ITEM)  return DEBUG_ACTION_GIVE_ITEM;
     const StatRow *row = &ROWS[id / 2];
     float v = get_value(row, st) + ((id % 2 == 0) ? -row->step : row->step);
     v = roundf(v / row->step) * row->step;   /* évite la dérive des flottants */
@@ -274,8 +285,12 @@ void debug_menu_render(const DebugMenu *m, SDL_Renderer *r, const PlayerStats *s
         draw_text(r, PANEL_X + 10.0f, y, row->label, 200);
 
         char value[32];
-        SDL_snprintf(value, sizeof value, "%.*f%s%s", row->decimals, (double)get_value(row, stats),
-                     row->unit[0] ? " " : "", row->unit);
+        if (row->names) {
+            SDL_snprintf(value, sizeof value, "%s", row->names[(int)get_value(row, stats)]);
+        } else {
+            SDL_snprintf(value, sizeof value, "%.*f%s%s", row->decimals, (double)get_value(row, stats),
+                         row->unit[0] ? " " : "", row->unit);
+        }
         draw_text(r, VALUE_END - (float)strlen(value) * GLYPH, y, value, 255);
 
         draw_button(r, m, i * 2,     "-", button_enabled(i * 2, stats));
@@ -286,4 +301,5 @@ void debug_menu_render(const DebugMenu *m, SDL_Renderer *r, const PlayerStats *s
     draw_button(r, m, BTN_BABY, BABY_LABEL, true);
     draw_button(r, m, BTN_FLOOR, FLOOR_LABEL, true);
     draw_button(r, m, BTN_KILL, KILL_LABEL, true);
+    draw_button(r, m, BTN_ITEM, ITEM_LABEL, true);
 }

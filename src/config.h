@@ -1,6 +1,8 @@
 #ifndef FUGUE_CONFIG_H
 #define FUGUE_CONFIG_H
 
+#include <stdbool.h>
+
 /* Résolution logique du jeu (GDD §10). Mise à l'échelle par facteur entier. */
 #define GAME_W 960
 #define GAME_H 540
@@ -17,7 +19,42 @@
 /* Autres pools statiques. */
 #define MAX_PICKUPS  16
 #define MAX_BOMBS    16
-#define MAX_HAZARDS  24
+#define MAX_HAZARDS  48
+
+/* Armes (GDD §4 et §14). */
+typedef enum WeaponId {
+    WEAPON_VOICE,
+    WEAPON_OLIFANT,
+    WEAPON_FLUTE,
+    WEAPON_LYRE,
+    WEAPON_TABOURIN,
+    WEAPON_BELL,
+    WEAPON_ORGAN,
+    WEAPON_COUNT
+} WeaponId;
+
+/* Forme d'un tir. */
+typedef enum ShotKind {
+    SHOT_NOTE,   /* note qui vole et disparaît au premier ennemi touché */
+    SHOT_WAVE,   /* onde de choc en arc : avance et traverse les ennemis */
+    SHOT_RING,   /* onde circulaire autour d'Amadeus */
+    SHOT_BEAM,   /* rayon instantané jusqu'au mur, traverse tout */
+} ShotKind;
+
+/* Attributs d'une arme : multiplient ceux du joueur (départ + objets). */
+typedef struct WeaponTuning {
+    ShotKind kind;
+    float damage_mul;
+    float fire_rate_mul;
+    float shot_speed_mul;
+    float range_mul;
+    float size;        /* taille de la note (1 = voix) */
+    int   count;       /* notes par tir */
+    float spread;      /* angle total de l'éventail, rad */
+    float stun;        /* étourdit l'ennemi touché, s */
+    float lock_time;   /* joueur cloué sur place après chaque tir, s */
+    bool  charge;      /* tir à charger (flûte) */
+} WeaponTuning;
 
 /*
  * Tous les paramètres de gameplay à ajuster, au même endroit.
@@ -119,6 +156,28 @@ typedef struct Tuning {
     float item_guido_shot_speed;
     float item_guido_shot_range;
     float item_sabots_speed;
+    float item_celeriter_fire_rate;   /* c : cadence + */
+    float expectare_at;               /* x : la note s'arrête à cette fraction de sa portée ... */
+    float expectare_pause;            /* ... pendant tant de s */
+    float altius_height_mul;          /* a : les notes volent plus haut (affichage) */
+    float trope_spread;               /* Trope : angle ajouté par note en plus, rad */
+    float ink_time;                   /* Liquescence : durée de la flaque, s */
+    float ink_radius;                 /* px */
+    float ink_slow;                   /* vitesse des ennemis dans l'encre (fraction) */
+
+    /* Armes (GDD §4) */
+    WeaponTuning weapons[WEAPON_COUNT];
+    float flute_charge_time;          /* charge complète à la cadence de départ, s */
+    float flute_min_damage;           /* multiplicateur de dégâts sans charge ... */
+    float flute_max_damage;           /* ... et à pleine charge */
+    float flute_max_size;             /* taille de la note à pleine charge */
+    float flute_recover;              /* pause après avoir relâché, s */
+    float wave_width;                 /* largeur de l'onde du tabourin au départ, px ... */
+    float wave_growth;                /* ... + tant par px parcouru */
+    float ring_grow_time;             /* la cloche résonne jusqu'à sa portée en tant de s */
+    float beam_time;                  /* durée d'affichage du rayon de l'orgue, s */
+    float beam_width;                 /* px */
+    float stun_star_hz;               /* étoiles des ennemis étourdis, tours/s */
 
     /* Barre de vie (soufflet de crescendo) */
     float hud_bar_base_len;    /* longueur du soufflet, px ... */

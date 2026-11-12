@@ -135,9 +135,10 @@ static void baby_update(Enemy *e, const Room *room, float target_x, float target
     float dy = target_y - (e->box.y + e->box.h * 0.5f);
     float len = sqrtf(dx * dx + dy * dy);
     float tx = 0.0f, ty = 0.0f;
-    if (len > 1.0f) {
-        tx = dx / len * tuning.baby_speed;
-        ty = dy / len * tuning.baby_speed;
+    float speed = tuning.baby_speed * (e->slow_timer > 0.0f ? tuning.ink_slow : 1.0f);
+    if (len > 1.0f && e->stun_timer <= 0.0f) {
+        tx = dx / len * speed;
+        ty = dy / len * speed;
     }
     move(e, room, tx, ty, tuning.baby_accel_time, dt);
 }
@@ -168,14 +169,15 @@ static void boss_update(Enemy *e, const Room *room, float dt)
             if (e->state_dur <= 0.0f) room_random_floor_point(room, 80.0f, &e->target_x, &e->target_y);
         } else if (len < 10.0f) {
             e->state_dur = rand_range(0.3f, 1.0f);
-        } else {
-            tx = dx / len * tuning.boss_speed;
-            ty = dy / len * tuning.boss_speed;
+        } else if (e->stun_timer <= 0.0f) {
+            float speed = tuning.boss_speed * (e->slow_timer > 0.0f ? tuning.ink_slow : 1.0f);
+            tx = dx / len * speed;
+            ty = dy / len * speed;
         }
         float px = e->box.x, py = e->box.y;
         move(e, room, tx, ty, tuning.baby_accel_time, dt);
         /* Coincé contre un obstacle : il change d'idée. */
-        if (len >= 10.0f && e->state_dur <= 0.0f && fabsf(e->box.x - px) + fabsf(e->box.y - py) < 0.01f) {
+        if (len >= 10.0f && e->state_dur <= 0.0f && e->stun_timer <= 0.0f && fabsf(e->box.x - px) + fabsf(e->box.y - py) < 0.01f) {
             room_random_floor_point(room, 80.0f, &e->target_x, &e->target_y);
         }
         if (e->jump_timer <= 0.0f) {
@@ -223,6 +225,8 @@ void enemy_update_all(EnemyPool *pool, const Room *room, float target_x, float t
         e->prev_y = e->box.y;
         e->anim_time += dt;
         if (e->hurt_timer > 0.0f) e->hurt_timer -= dt;
+        if (e->stun_timer > 0.0f) e->stun_timer -= dt;
+        if (e->slow_timer > 0.0f) e->slow_timer -= dt;
 
         if (e->type == ENEMY_BOSS) {
             boss_update(e, room, dt);
@@ -231,6 +235,16 @@ void enemy_update_all(EnemyPool *pool, const Room *room, float target_x, float t
         }
     }
     separate(pool, room);
+}
+
+void enemy_stun(Enemy *e, float seconds)
+{
+    e->stun_timer = SDL_max(e->stun_timer, seconds);
+}
+
+void enemy_slow(Enemy *e, float seconds)
+{
+    e->slow_timer = SDL_max(e->slow_timer, seconds);
 }
 
 bool enemy_tangible(const Enemy *e)
@@ -517,5 +531,21 @@ void enemy_render(const Enemy *e, SDL_Renderer *r, float alpha, Camera cam)
         boss_render(e, r, alpha, cam);
     } else {
         baby_render(e, r, alpha, cam);
+    }
+    float x = e->prev_x + (e->box.x - e->prev_x) * alpha + e->box.w * 0.5f - cam.x;
+    float feet = e->prev_y + (e->box.y - e->prev_y) * alpha + e->box.h - cam.y;
+    /* Ralenti : de l'encre colle à ses pieds. */
+    if (e->slow_timer > 0.0f && enemy_tangible(e)) {
+        draw_ellipse(r, x, feet - 2.0f, e->box.w * 0.55f, 4.0f, (SDL_Color){ 26, 30, 64, 200 });
+    }
+    /* Étourdi : trois étoiles tournent au-dessus de sa tête. */
+    if (e->stun_timer > 0.0f && enemy_tangible(e)) {
+        float top = feet - (e->type == ENEMY_BOSS ? 150.0f : 58.0f);
+        for (int k = 0; k < 3; k++) {
+            float a = e->anim_time * tuning.stun_star_hz * 2.0f * SDL_PI_F + (float)k * 2.0f * SDL_PI_F / 3.0f;
+            float sx = x + cosf(a) * 14.0f, sy = top + sinf(a) * 4.0f;
+            draw_rect(r, sx - 1.0f, sy - 3.0f, 2.0f, 6.0f, (SDL_Color){ 255, 220, 60, 255 });
+            draw_rect(r, sx - 3.0f, sy - 1.0f, 6.0f, 2.0f, (SDL_Color){ 255, 220, 60, 255 });
+        }
     }
 }

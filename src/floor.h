@@ -57,8 +57,9 @@ typedef struct FloorRoom {
     int       babies;         /* bébés à faire apparaître à la première visite */
     bool      visited;
     bool      cleared;        /* vidée de ses ennemis : portes ouvertes pour de bon */
-    int       offers[TREASURE_OFFERS]; /* salle du trésor : objet sur chaque lutrin (ItemId), -1 si aucun.
+    int       offers[TREASURE_OFFERS]; /* trésor et boss : objet sur chaque lutrin (ItemId), -1 si aucun.
                                           Rempli par le jeu, qui sait quels objets sont déjà pris. */
+    int       weapon_offer;            /* trésor et boss : arme sur le socle (WeaponId), -1 si aucune */
 } FloorRoom;
 
 typedef struct Floor {

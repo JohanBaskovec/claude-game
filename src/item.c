@@ -7,6 +7,8 @@ const char *item_name(ItemId id)
 {
     static const TextId names[ITEM_COUNT] = {
         TXT_ITEM_LULLY_NAME, TXT_ITEM_HAYDN_NAME, TXT_ITEM_SATIE_NAME, TXT_ITEM_GUIDO_NAME, TXT_ITEM_SABOTS_NAME,
+        TXT_ITEM_CELERITER_NAME, TXT_ITEM_ALTIUS_NAME, TXT_ITEM_EXPECTARE_NAME, TXT_ITEM_LIQUESCENCE_NAME,
+        TXT_ITEM_TROPE_NAME,
     };
     return (id >= 0 && id < ITEM_COUNT) ? text_get(names[id]) : "";
 }
@@ -15,6 +17,8 @@ const char *item_desc(ItemId id)
 {
     static const TextId descs[ITEM_COUNT] = {
         TXT_ITEM_LULLY_DESC, TXT_ITEM_HAYDN_DESC, TXT_ITEM_SATIE_DESC, TXT_ITEM_GUIDO_DESC, TXT_ITEM_SABOTS_DESC,
+        TXT_ITEM_CELERITER_DESC, TXT_ITEM_ALTIUS_DESC, TXT_ITEM_EXPECTARE_DESC, TXT_ITEM_LIQUESCENCE_DESC,
+        TXT_ITEM_TROPE_DESC,
     };
     return (id >= 0 && id < ITEM_COUNT) ? text_get(descs[id]) : "";
 }
@@ -39,7 +43,10 @@ void item_apply(ItemId id, PlayerStats *st)
     case ITEM_SABOTS:
         st->speed += tuning.item_sabots_speed;
         break;
-    default:
+    case ITEM_CELERITER:
+        st->fire_rate += tuning.item_celeriter_fire_rate;
+        break;
+    default:   /* les autres changent la forme des tirs : lus au moment du tir (game.c) */
         break;
     }
 }
@@ -109,6 +116,39 @@ void item_render(ItemId id, SDL_Renderer *r, float cx, float cy)
             draw_rect(r, ox + 8, oy - 3, 5, 5, wood);
             draw_rect(r, ox + 1, oy + 1, 6, 3, dark);
         }
+        break;
+    }
+    case ITEM_CELERITER:
+    case ITEM_ALTIUS:
+    case ITEM_EXPECTARE: {
+        /* Lettre significative : une lettre rouge sur un bout de parchemin. */
+        static const char letters[] = { 'c', 'a', 'x' };
+        char s[2] = { letters[id - ITEM_CELERITER], 0 };
+        draw_rect(r, cx - 13, cy - 14, 26, 28, ink);
+        draw_rect(r, cx - 12, cy - 13, 24, 26, (SDL_Color){ 244, 236, 214, 255 });
+        draw_debug_text(r, cx - 12, cy - 13, s, 3.0f, (SDL_Color){ 190, 40, 40, 255 });
+        break;
+    }
+    case ITEM_LIQUESCENCE: {
+        /* Goutte d'encre qui fond. */
+        SDL_Color blue = { 30, 34, 70, 255 };
+        draw_ellipse(r, cx, cy + 5, 10, 10, ink);
+        draw_ellipse(r, cx, cy + 5, 8.5f, 8.5f, blue);
+        for (int k = 0; k < 6; k++) draw_rect(r, cx - (float)k * 1.2f, cy - 12 + k * 2.5f, 2.4f * (float)k + 1, 3, blue);
+        draw_ellipse(r, cx + 9, cy + 15, 7, 2.5f, blue);
+        draw_rect(r, cx - 4, cy + 1, 3, 3, (SDL_Color){ 120, 130, 190, 255 });
+        break;
+    }
+    case ITEM_TROPE: {
+        /* Une croche et un « + ». */
+        SDL_Color pink = { 255, 70, 168, 255 };
+        draw_rect(r, cx - 10, cy + 4, 12, 9, ink);
+        draw_rect(r, cx - 9, cy + 5, 10, 7, pink);
+        draw_rect(r, cx, cy - 13, 2, 18, ink);
+        draw_rect(r, cx + 2, cy - 13, 4, 3, ink);
+        draw_rect(r, cx + 5, cy - 11, 2, 4, ink);
+        draw_rect(r, cx + 7, cy - 4, 10, 4, (SDL_Color){ 190, 40, 40, 255 });
+        draw_rect(r, cx + 10, cy - 7, 4, 10, (SDL_Color){ 190, 40, 40, 255 });
         break;
     }
     default:

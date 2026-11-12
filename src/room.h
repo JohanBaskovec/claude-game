@@ -22,10 +22,17 @@
 #define DOOR_H       64.0f    /* ouverture des portes de gauche et de droite */
 
 #define ROOM_MAX_WALLS (ROOM_MAX_CELLS * 4 * 2)
-#define ROOM_MAX_PROPS TREASURE_OFFERS
+#define ROOM_MAX_PROPS (TREASURE_OFFERS + 1)   /* 3 lutrins + 1 socle d'arme */
 #define LUTRIN_W     52.0f    /* pied du lutrin (obstacle) */
 #define LUTRIN_H     22.0f
 #define LUTRIN_GAP   176.0f   /* écart entre deux lutrins */
+#define CHEST_W      64.0f    /* socle d'arme : un coffre */
+#define CHEST_H      24.0f
+
+typedef enum PropKind {
+    PROP_LUTRIN,   /* porte un objet passif (offers[i]) */
+    PROP_WEAPON,   /* socle d'arme (weapon_offer) */
+} PropKind;
 
 typedef struct RoomDoor {
     Dir       side;
@@ -46,16 +53,20 @@ typedef struct Room {
     int       door_count;
     RoomDoor  doors[ROOM_MAX_DOORS];
     bool      doors_open;
-    int       prop_count;      /* lutrins de la salle du trésor : obstacles */
+    int       prop_count;      /* meubles (lutrins, socle d'arme) : obstacles */
     SDL_FRect props[ROOM_MAX_PROPS];
+    PropKind  prop_kind[ROOM_MAX_PROPS];
     bool      trapdoor;        /* trappe vers l'étage suivant (salle du boss vaincu) */
     float     trapdoor_x, trapdoor_y;
 } Room;
 
 void room_build(Room *room, const Floor *floor, int index);
 
-/* Vrai si le rectangle chevauche un mur, un lutrin ou une porte fermée. */
+/* Vrai si le rectangle chevauche un mur, un meuble ou une porte fermée. */
 bool room_overlaps_wall(const Room *room, const SDL_FRect *r);
+
+/* Idem, en ignorant les meubles si props est faux (notes qui passent au-dessus). */
+bool room_overlaps_solid(const Room *room, const SDL_FRect *r, bool props);
 
 /*
  * Déplace une boîte de (dx, dy) en la bloquant contre les murs.
@@ -87,13 +98,16 @@ void room_middle(const Room *room, float *x, float *y);
 /* Fait apparaître la trappe au milieu de la salle. */
 void room_open_trapdoor(Room *room);
 
+/* Pose les 3 lutrins et le socle d'arme (salle du trésor, ou salle du boss vaincu). */
+void room_place_offers(Room *room, bool boss);
+
 /* Caméra qui suit le point (x, y), bornée aux murs de la salle. */
 Camera room_camera(const Room *room, float x, float y);
 
 /* Sol, murs, portes et trappe. */
 void room_render(const Room *room, SDL_Renderer *renderer, Camera cam);
 
-/* Un lutrin, trié par profondeur avec les personnages (bas = props[i].y + h). */
-void room_render_lutrin(const Room *room, int i, SDL_Renderer *renderer, Camera cam);
+/* Un meuble, trié par profondeur avec les personnages (bas = props[i].y + h). */
+void room_render_prop(const Room *room, int i, SDL_Renderer *renderer, Camera cam);
 
 #endif

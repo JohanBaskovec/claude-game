@@ -30,6 +30,8 @@ typedef struct Enemy {
     float     hurt_timer;     /* > 0 : clignote après une touche */
     float     anim_time;      /* pour le dandinement */
     float     max_hp;
+    float     stun_timer;     /* > 0 : étourdi, ne bouge plus */
+    float     slow_timer;     /* > 0 : ralenti (encre) */
 
     /* Boss */
     BossState state;
@@ -67,6 +69,10 @@ int enemy_contact_damage(const Enemy *e);
 
 /* Retire des PV et donne une poussée (kx, ky) en px/s. Renvoie true s'il meurt. */
 bool enemy_hurt(Enemy *e, float damage, float kx, float ky);
+
+/* États : étourdi (ne bouge plus), ralenti. Gardent la plus longue durée. */
+void enemy_stun(Enemy *e, float seconds);
+void enemy_slow(Enemy *e, float seconds);
 
 /* Le boss vivant de la salle, NULL si aucun. */
 const Enemy *enemy_find_boss(const EnemyPool *pool);

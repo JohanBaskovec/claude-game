@@ -120,19 +120,32 @@ void room_build(Room *room, const Floor *floor, int index)
         }
     }
 
-    /* Salle du trésor : trois lutrins alignés au milieu de la salle. */
     if (fr->kind == ROOM_TREASURE) {
-        float mx, my;
-        room_middle(room, &mx, &my);
-        for (int i = 0; i < ROOM_MAX_PROPS; i++) {
-            float x = mx + ((float)i - (ROOM_MAX_PROPS - 1) * 0.5f) * LUTRIN_GAP;
-            room->props[room->prop_count++] = (SDL_FRect){ x - LUTRIN_W * 0.5f, my - LUTRIN_H * 0.5f, LUTRIN_W, LUTRIN_H };
-        }
+        room_place_offers(room, false);
     }
-    /* Salle du boss déjà vaincu : la trappe est toujours là. */
+    /* Salle du boss déjà vaincu : la trappe et les récompenses sont toujours là. */
     if (fr->kind == ROOM_BOSS && fr->cleared) {
         room_open_trapdoor(room);
+        room_place_offers(room, true);
     }
+}
+
+void room_place_offers(Room *room, bool boss)
+{
+    float mx, my;
+    room_middle(room, &mx, &my);
+    /* Trésor : lutrins au-dessus du centre, socle d'arme en dessous.
+     * Boss : la trappe au centre, lutrins plus haut, socle plus bas. */
+    float lutrin_y = my + (boss ? -85.0f : -40.0f);
+    float chest_y = my + (boss ? 100.0f : 90.0f);
+    room->prop_count = 0;
+    for (int i = 0; i < TREASURE_OFFERS; i++) {
+        float x = mx + ((float)i - (TREASURE_OFFERS - 1) * 0.5f) * LUTRIN_GAP;
+        room->prop_kind[room->prop_count] = PROP_LUTRIN;
+        room->props[room->prop_count++] = (SDL_FRect){ x - LUTRIN_W * 0.5f, lutrin_y - LUTRIN_H * 0.5f, LUTRIN_W, LUTRIN_H };
+    }
+    room->prop_kind[room->prop_count] = PROP_WEAPON;
+    room->props[room->prop_count++] = (SDL_FRect){ mx - CHEST_W * 0.5f, chest_y - CHEST_H * 0.5f, CHEST_W, CHEST_H };
 }
 
 void room_middle(const Room *room, float *x, float *y)
@@ -164,10 +177,15 @@ void room_open_trapdoor(Room *room)
 
 bool room_overlaps_wall(const Room *room, const SDL_FRect *r)
 {
+    return room_overlaps_solid(room, r, true);
+}
+
+bool room_overlaps_solid(const Room *room, const SDL_FRect *r, bool props)
+{
     for (int i = 0; i < room->wall_count; i++) {
         if (overlaps(r, &room->walls[i])) return true;
     }
-    for (int i = 0; i < room->prop_count; i++) {
+    for (int i = 0; props && i < room->prop_count; i++) {
         if (overlaps(r, &room->props[i])) return true;
     }
     if (!room->doors_open) {
@@ -351,11 +369,31 @@ void room_render(const Room *room, SDL_Renderer *r, Camera cam)
     }
 }
 
-/* Lutrin médiéval (placeholder du socle des objets) : pied, colonne et pupitre incliné. */
-void room_render_lutrin(const Room *room, int i, SDL_Renderer *r, Camera cam)
+/* Coffre de bois cerclé de fer (placeholder du socle d'arme). */
+static void render_chest(SDL_Renderer *r, float cx, float feet)
+{
+    SDL_Color ink = { 40, 24, 16, 255 }, wood = { 128, 78, 40, 255 }, light = { 166, 108, 58, 255 };
+    SDL_Color iron = { 70, 70, 80, 255 };
+    draw_ellipse(r, cx, feet - 3, 38, 8, (SDL_Color){ 60, 40, 30, 90 });
+    draw_rect(r, cx - 33, feet - 34, 66, 33, ink);
+    draw_rect(r, cx - 32, feet - 33, 64, 31, wood);
+    draw_rect(r, cx - 32, feet - 33, 64, 9, light);   /* couvercle */
+    draw_rect(r, cx - 32, feet - 24, 64, 2, ink);
+    draw_rect(r, cx - 24, feet - 33, 4, 31, iron);
+    draw_rect(r, cx + 20, feet - 33, 4, 31, iron);
+    draw_rect(r, cx - 4, feet - 24, 8, 8, iron);       /* serrure */
+    draw_rect(r, cx - 1, feet - 21, 2, 3, ink);
+}
+
+void room_render_prop(const Room *room, int i, SDL_Renderer *r, Camera cam)
 {
     const SDL_FRect *p = &room->props[i];
     float cx = p->x + p->w * 0.5f - cam.x, feet = p->y + p->h - cam.y;
+    if (room->prop_kind[i] == PROP_WEAPON) {
+        render_chest(r, cx, feet);
+        return;
+    }
+    /* Lutrin médiéval (placeholder du socle des objets) : pied, colonne et pupitre incliné. */
     SDL_Color ink = { 40, 24, 16, 255 }, wood = { 128, 78, 40, 255 }, light = { 166, 108, 58, 255 };
 
     draw_ellipse(r, cx, feet - 4, 30, 8, (SDL_Color){ 60, 40, 30, 90 });

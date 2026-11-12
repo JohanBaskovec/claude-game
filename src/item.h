@@ -13,6 +13,11 @@ typedef enum ItemId {
     ITEM_SATIE,    /* Vexations */
     ITEM_GUIDO,    /* Main guidonienne */
     ITEM_SABOTS,   /* Sabots de Strasbourg */
+    ITEM_CELERITER,   /* c : cadence + */
+    ITEM_ALTIUS,      /* a : au-dessus des obstacles */
+    ITEM_EXPECTARE,   /* x : pause en l'air */
+    ITEM_LIQUESCENCE, /* flaque d'encre qui ralentit */
+    ITEM_TROPE,       /* une note de plus */
     ITEM_COUNT
 } ItemId;
 

@@ -93,6 +93,7 @@ static int try_place(Floor *f, RoomShape shape, int ox, int oy, int parent)
     room->kind = ROOM_NORMAL;
     room->cell_count = n;
     for (int i = 0; i < TREASURE_OFFERS; i++) room->offers[i] = -1;
+    room->weapon_offer = -1;
     for (int i = 0; i < n; i++) {
         room->cell_x[i] = ox + SHAPE_CELLS[shape][i][0];
         room->cell_y[i] = oy + SHAPE_CELLS[shape][i][1];

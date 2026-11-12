@@ -3,7 +3,7 @@
 > Document de travail destiné à Claude Code. Il décrit l'univers et les choix de design.
 > **Statut : en cours de conception.** Les sections marquées ✅ sont décidées, 💡 sont des idées à valider, ❓ sont des questions ouvertes.
 > **Source de vérité du design : ce fichier, dans le dépôt** (`docs/concept/GDD.md`). La conception se fait désormais uniquement avec Claude Code, qui le met à jour au fil des décisions prises avec Johan.
-> **Phase en cours : Phase 4 (section 13).** Les Phases 1 à 3 (sections 10 à 12) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
+> **Phase en cours : Phase 5 (section 14).** Les Phases 1 à 4 (sections 10 à 13) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
 
 ---
 
@@ -105,6 +105,26 @@ Concept visuel 💡 :
 - Carnation ocre avec ombres verdâtres (verdaccio des peintres médiévaux), pour ressortir sur le sol parchemin.
 - 💡 Comme dans TBOI, **les objets ramassés modifient son apparence** : perruque baroque, tonsure de moine, etc. Il finit en patchwork d'époques.
 
+### Armes (instruments) ✅
+- Amadeus porte **une arme** qui a ses propres attributs de tir.
+- **Calcul** : attribut final = (valeur de départ + bonus des objets) × multiplicateur de l'arme. L'arme définit ses multiplicateurs et sa façon de tirer ; les objets donnent des bonus.
+- Il commence avec **sa voix**. Ramasser une arme **remplace** l'arme actuelle, qui **reste posée sur le socle** : on peut revenir la reprendre.
+- **Où les trouver** : **1 arme** dans chaque salle du trésor et **1 arme** après chaque boss, **en plus** des objets passifs. L'arme ne fait pas partie du choix « 1 objet sur 3 » : on peut prendre l'arme et un objet.
+- **Un jeu d'armes par époque** (luth à la Renaissance, clavecin au Baroque, guitare électrique au XXe…). Ci-dessous, les armes du Haut Moyen Âge.
+- Qu'un objet passif ressemble à une arme n'est pas un problème : ça laisse le choix au joueur.
+
+| Arme | Effet |
+|---|---|
+| Voix | Arme de départ : la note. |
+| Olifant | Gros projectile lent, gros dégâts, cadence et vitesse de tir faibles. **Étourdit.** |
+| Flûte | Tir à charger : plus on relâche tard, plus les dégâts sont gros. Le temps de charge dépend de la cadence de tir. |
+| Lyre | 3 notes en même temps, en arc de cercle ; cadence plus faible que la voix. |
+| Tabourin | Pas de note : une **onde de choc en arc de cercle** qui traverse les ennemis. Sinon mêmes attributs que la voix. Les objets passifs s'y appliquent quand ça a un sens (flaque d'encre au bout de l'onde, pause en l'air…). |
+| Cloche d'église | Dégâts ×10, cadence ÷8. Le son **résonne tout autour d'Amadeus** (onde circulaire), pour qu'un tir ne soit jamais raté. |
+| Orgue | Dégâts ×20, cadence ÷10. Un **gros rayon qui traverse tout**. Amadeus est **cloué sur place ≈ 0,5 s** à chaque tir, le temps de jouer l'accord. |
+
+- **États des ennemis** (système commun) : **étourdi** (ne bouge plus) et **ralenti**.
+
 ## 5. Équivalences avec TBOI
 
 | TBOI | Fugue in Amadeus Minor | Statut | Notes |
@@ -130,6 +150,45 @@ Concept visuel 💡 :
 - **Vexations (Satie)** : le tir se répète en boucle. La pièce doit être jouée 840 fois.
 - **Bibliothèque d'Alkan** : selon la légende, il est mort écrasé par sa bibliothèque.
 - **Main guidonienne** : moyen mnémotechnique médiéval où chaque phalange porte une note. Peut aussi devenir un personnage jouable, une main tranchée et vivante.
+
+### Neumes et polyphonie : objets passifs du Haut Moyen Âge 💡
+Ils modifient les notes (comme les objets de tir de TBOI) et se combinent entre eux.
+
+**Lettres significatives** (petites lettres ajoutées aux neumes dans les manuscrits de Saint-Gall) :
+
+| Objet | Sens | Effet |
+|---|---|---|
+| c (*celeriter*) | « vite » | Cadence de tir en hausse. |
+| t (*tenete*) | « tenez » | Les notes durent plus longtemps (portée en hausse). |
+| a (*altius*) | « plus haut » | Les notes passent au-dessus des obstacles. |
+| x (*expectare*) | « attendez » | Les notes marquent une pause en l'air, puis repartent. |
+| s (*sursum*) | « vers le haut » | Les notes s'élèvent et retombent en zone (tir en cloche). |
+
+**Formes de neumes** :
+
+| Objet | Effet |
+|---|---|
+| Épisème (le petit trait qui allonge une note) | Notes plus longues et plus lourdes : plus de dégâts, moins vite. |
+| Quilisma (le neume tremblé) | Trajectoire qui vibre, plus facile de toucher. |
+| Liquescence (le neume qui « fond ») | Les notes laissent une flaque d'encre qui ralentit les ennemis. |
+
+**Polyphonie et chant** :
+
+| Objet | Effet |
+|---|---|
+| Organum | Chaque note est doublée par une note parallèle, à la quinte. Première polyphonie, décrite par la *Musica enchiriadis* (fin du IXe siècle). |
+| Mélisme | Chaque tir devient une rafale de petites notes (beaucoup de notes sur une seule syllabe). |
+| Jubilus | La dernière note de chaque rafale est énorme (le long mélisme final de l'Alléluia). |
+| Antiphonie | Les tirs alternent entre la gauche et la droite d'Amadeus, comme deux chœurs qui se répondent. |
+| Répons | Chaque tir déclenche un « écho » du chœur une seconde plus tard. |
+| Teneur (note de récitation des psaumes) | Tirer sans bouger crée un rayon fixe. |
+| Trope | Un projectile de plus à chaque tir (un trope est un ajout dans un chant existant). |
+
+Précisions ✅ :
+- **Quilisma** : la trajectoire qui vibre s'accompagne d'une note plus grosse (sinon la vibration rendrait la visée plus difficile).
+- **Jubilus** sans Mélisme : une note énorme toutes les 5 notes.
+- Les doublons avec les armes sont voulus (Teneur / Orgue, Épisème / Olifant, Trope / Lyre / Organum) : le joueur choisit. Trope tire en éventail, Organum en parallèle, Lyre en arc.
+- Les objets d'anecdotes (Lully, Haydn…) deviennent des objets **rares**, possibles à toutes les époques.
 
 ## 7. Personnages déblocables 💡
 
@@ -396,7 +455,7 @@ Sol en double page (texte latin, reliure), portes à serrure, salles spéciales 
 
 ---
 
-## 13. PHASE 4 — Une vraie partie (en cours)
+## 13. PHASE 4 — Une vraie partie ✅ (terminée)
 
 **But** : une partie complète façon roguelike : explorer, ramasser des prix, choisir un objet, battre le boss, descendre à l'étage suivant, mourir, recommencer.
 
@@ -464,3 +523,37 @@ Cinq objets pour tester la salle du trésor. Les noms viennent des anecdotes de 
 ### Hors périmètre (ne pas faire)
 Écran de mort, boutique, clés et portes à serrure, autres prix (cœurs, clés, partitions…), apparence d'Amadeus modifiée par les objets, boss différents selon l'étage, sons, graphismes finaux.
 
+## 14. PHASE 5 — Armes et premiers neumes (en cours)
+
+**But** : le système de tir paramétrable, les armes du Haut Moyen Âge et quelques neumes pour vérifier que tout se combine.
+
+### Tir paramétrable ✅
+- Un tir = nombre de notes, dispersion, taille, forme (note, onde en arc, onde circulaire, rayon), trajectoire (pause en l'air), effets au contact (étourdir, flaque d'encre), passe ou non au-dessus des obstacles.
+- Armes et objets ne font que régler ces paramètres, pour que tout se combine.
+
+### Armes ✅
+- Les 6 armes de la section 4 + la voix, avec le calcul (départ + objets) × arme.
+- **Socle d'arme** (placeholder : un coffre en bois) : toucher le socle échange son arme avec celle d'Amadeus ; l'ancienne reste dessus. Il faut s'éloigner du socle avant de pouvoir échanger à nouveau.
+- Icône de l'arme actuelle dans l'interface, à côté des compteurs.
+
+### Où trouver armes et objets ✅
+- **Salle du trésor** : 3 lutrins (1 objet passif au choix) **+ 1 socle d'arme**.
+- **Après le boss** : la trappe, **3 lutrins** (1 objet au choix) **+ 1 socle d'arme**.
+- Les objets proposés au trésor et après le boss sont tous différents ; les armes proposées aussi, et jamais celle qu'on tient.
+
+### États des ennemis ✅
+- **Étourdi** : l'ennemi ne bouge plus (des étoiles tournent au-dessus de sa tête). **Ralenti** : vitesse réduite.
+
+### Premiers objets passifs ✅
+- **c** (*celeriter*) : cadence de tir +1.
+- **a** (*altius*) : les notes passent au-dessus des obstacles (lutrins, socles ; pas les murs).
+- **x** (*expectare*) : les notes s'arrêtent un instant en l'air, puis repartent.
+- **Liquescence** : les notes laissent une flaque d'encre qui ralentit les ennemis.
+- **Trope** : une note de plus à chaque tir, en éventail.
+- Ils rejoignent les 5 objets provisoires de la Phase 4.
+
+### Debug
+- **F2** : ligne « Arme » (choix de l'arme) et bouton « Donner un objet ».
+
+### Hors périmètre (ne pas faire)
+Les autres neumes et objets de polyphonie, les armes des autres époques, l'apparence d'Amadeus selon l'arme, les sons, les graphismes finaux.

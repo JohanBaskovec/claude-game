@@ -1,6 +1,7 @@
 #include "hud.h"
 #include "config.h"
 #include "draw.h"
+#include "weapon.h"
 
 #include <math.h>
 
@@ -104,6 +105,11 @@ void hud_render(const Hud *hud, SDL_Renderer *r, const PlayerStats *stats)
     draw_number(r, COUNT_X + 14.0f, COUNT_Y - 5.0f, stats->coins, 2, 2.0f, text);
     draw_metronome(r, COUNT_X, COUNT_Y + COUNT_STEP, 1.0f, 0.35f);
     draw_number(r, COUNT_X + 14.0f, COUNT_Y + COUNT_STEP - 5.0f, stats->bombs, 2, 2.0f, text);
+
+    /* Arme tenue, dans un cadre à côté des compteurs. */
+    draw_rect(r, 86, 64, 40, 40, (SDL_Color){ 236, 226, 204, 255 });
+    draw_rect(r, 88, 66, 36, 36, (SDL_Color){ 196, 184, 160, 255 });   /* fond parchemin, comme le sol */
+    weapon_render_icon((WeaponId)stats->weapon, r, 106, 84, 0.95f);
 
     /* Bandeau de l'objet ramassé, qui s'efface à la fin. */
     if (hud->banner_timer > 0.0f && hud->banner_title) {
