@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include "input.h"   /* Dir */
+#include "layout.h"
 
 /*
  * Plan d'un étage (GDD §9 et §12) : la double page est une grille de
@@ -62,6 +63,7 @@ typedef struct FloorRoom {
     int       offers[TREASURE_OFFERS]; /* trésor et boss : objet sur chaque lutrin (ItemId), -1 si aucun.
                                           Rempli par le jeu, qui sait quels objets sont déjà pris. */
     int       weapon_offer;            /* trésor et boss : arme sur le socle (WeaponId), -1 si aucune */
+    RoomLayout layout;                 /* trous et obstacles (GDD §21), modifiés en jeu */
 } FloorRoom;
 
 typedef struct Floor {

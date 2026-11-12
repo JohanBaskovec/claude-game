@@ -8,9 +8,10 @@
 #include "room.h"
 
 /*
- * Décor du premier étage (GDD §9 et §15), calculé par le jeu, sans fichier image :
- * murs de briques en perspective, portes sous un arc de claveaux, dalles du sol,
- * manuscrit à neumes sur toute la double page et reliure dans la colonne centrale.
+ * Décor du premier étage (GDD §9, §15 et §21), calculé par le jeu, sans fichier image :
+ * murs peints en perspective, portes sous un arc de claveaux peints, sol en parchemin,
+ * manuscrit à neumes sur toute la double page, reliure dans la colonne centrale,
+ * trous du parchemin (mis à jour quand un ver en perce un), petites choses sur la page.
  * Chaque salle est dessinée une fois dans une texture, la première fois qu'on l'affiche.
  */
 
@@ -18,8 +19,9 @@
 void decor_init(void);
 void decor_quit(void);
 
-/* Étage affiché : à chaque nouvelle graine, met en page la double page et oublie les salles déjà dessinées. */
-void decor_set_floor(Uint64 seed);
+/* Étage affiché : à chaque nouvelle graine, met en page la double page (le texte contourne
+ * les trous du plan) et oublie les salles déjà dessinées. */
+void decor_set_floor(const Floor *floor);
 
 /* Sol, murs et portes (le bois des portes seulement si elles sont fermées). */
 void decor_render_room(const Room *room, SDL_Renderer *renderer, Camera cam);

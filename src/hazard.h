@@ -10,8 +10,9 @@
 /* Dangers et traces au sol :
  * - brique qui tombe du plafond (atterrissage du Gros Bébé, GDD §13), annoncée par une ombre ;
  * - flaque d'encre (Liquescence, GDD §14) qui ralentit les ennemis ;
- * - flaque d'encre toxique (crachat de la plume, GDD §16) qui blesse le joueur. */
-typedef enum HazardType { HAZARD_BRICK, HAZARD_INK, HAZARD_TOXIC } HazardType;
+ * - flaque d'encre toxique (crachat de la plume, GDD §16) qui blesse le joueur ;
+ * - flaque de cire d'une chandelle éteinte (GDD §21), où Amadeus glisse. Elle ne sèche pas. */
+typedef enum HazardType { HAZARD_BRICK, HAZARD_INK, HAZARD_TOXIC, HAZARD_WAX } HazardType;
 
 typedef struct Hazard {
     bool  active;
@@ -30,8 +31,9 @@ void hazard_pool_clear(HazardPool *pool);
 Hazard *hazard_spawn_brick(HazardPool *pool, float x, float y, float fall_time);
 Hazard *hazard_spawn_ink(HazardPool *pool, float x, float y);
 Hazard *hazard_spawn_toxic(HazardPool *pool, float x, float y);
+Hazard *hazard_spawn_wax(HazardPool *pool, float x, float y);
 
-/* Vrai si (x, y) est dans une flaque du type donné (HAZARD_INK ou HAZARD_TOXIC). */
+/* Vrai si (x, y) est dans une flaque du type donné (HAZARD_INK, HAZARD_TOXIC ou HAZARD_WAX). */
 bool hazard_in(const HazardPool *pool, HazardType type, float x, float y);
 
 /* Avance d'un pas. Renvoie true au pas où la brique touche le sol. */

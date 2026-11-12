@@ -82,7 +82,7 @@ Enemy *enemy_spawn_away_from(EnemyPool *pool, const Room *room, EnemyType type, 
     float best_d2 = -1.0f;
     for (int attempt = 0; attempt < 32; attempt++) {
         float cx, cy;
-        room_random_floor_point(room, margin, &cx, &cy);
+        room_random_free_point(room, margin, 44.0f, 40.0f, &cx, &cy);   /* pas sur un obstacle ni dans un trou */
         float d2 = (cx - avoid_x) * (cx - avoid_x) + (cy - avoid_y) * (cy - avoid_y);
         if (d2 > best_d2) {
             best_d2 = d2;
@@ -150,17 +150,20 @@ static void move(Enemy *e, const Room *room, float tx, float ty, float accel_tim
 /* Bébé : fonce vers le joueur, avec de l'inertie. */
 static void baby_update(Enemy *e, const Room *room, float target_x, float target_y, float dt)
 {
-    float dx = target_x - (e->box.x + e->box.w * 0.5f);
-    float dy = target_y - (e->box.y + e->box.h * 0.5f);
+    float ex = e->box.x + e->box.w * 0.5f, ey = e->box.y + e->box.h * 0.5f, sx, sy;
+    room_steer(room, ex, ey, target_x, target_y, &sx, &sy);   /* contourne obstacles et trous */
+    float dx = sx - ex;
+    float dy = sy - ey;
     float len = sqrtf(dx * dx + dy * dy);
+    float face_dx = target_x - ex;
     float tx = 0.0f, ty = 0.0f;
     float speed = tuning.baby_speed * (e->slow_timer > 0.0f ? tuning.ink_slow : 1.0f);
     if (len > 1.0f && e->stun_timer <= 0.0f) {
         tx = dx / len * speed;
         ty = dy / len * speed;
         /* Un peu de marge : il ne se retourne pas sans cesse quand le joueur est juste au-dessus ou en dessous. */
-        if (dx < -4.0f) e->face_left = true;
-        else if (dx > 4.0f) e->face_left = false;
+        if (face_dx < -4.0f) e->face_left = true;
+        else if (face_dx > 4.0f) e->face_left = false;
     }
     move(e, room, tx, ty, tuning.baby_accel_time, dt);
 }
@@ -258,8 +261,19 @@ static void keep_distance(Enemy *e, const Room *room, float px, float py, float 
     float tx = 0.0f, ty = 0.0f;
     if (len > 1.0f && e->stun_timer <= 0.0f) {
         float k = len > far ? 1.0f : (len < near ? -1.0f : 0.0f);
-        tx = dx / len * slowed(e, speed) * k;
-        ty = dy / len * slowed(e, speed) * k;
+        float mx = dx / len, my = dy / len;
+        if (k > 0.0f) {
+            /* Pour s'approcher, il contourne les obstacles. */
+            float sx, sy;
+            room_steer(room, cx, cy, px, py, &sx, &sy);
+            float sl = sqrtf((sx - cx) * (sx - cx) + (sy - cy) * (sy - cy));
+            if (sl > 1.0f) {
+                mx = (sx - cx) / sl;
+                my = (sy - cy) / sl;
+            }
+        }
+        tx = mx * slowed(e, speed) * k;
+        ty = my * slowed(e, speed) * k;
         face(e, dx);
     }
     move(e, room, tx, ty, tuning.baby_accel_time, dt);
@@ -337,7 +351,20 @@ static void worm_set_state(Enemy *e, WormState s, float dur)
 }
 
 /* Ver de livre : caché, il choisit l'endroit où est le joueur ; le sol s'y soulève, puis il jaillit. */
-static void worm_update(Enemy *e, const Room *room, float px, float py, float dt)
+void enemy_worm_tiles(const EnemyPool *pool, const RoomLayout *L, const Enemy *except, TileMask out)
+{
+    SDL_memset(out, 0, sizeof(TileMask));
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        const Enemy *o = &pool->items[i];
+        if (o == except || !o->active || o->type != ENEMY_WORM || o->state == WORM_HIDDEN) continue;
+        float ox, oy;
+        int tx, ty;
+        enemy_center(o, &ox, &oy);
+        if (layout_tile_at(L, ox, oy, &tx, &ty)) out[ty][tx] = 1;
+    }
+}
+
+static void worm_update(Enemy *e, const EnemyPool *pool, const Room *room, float px, float py, float dt)
 {
     e->vx = e->vy = 0.0f;
     float cx, cy;
@@ -352,15 +379,32 @@ static void worm_update(Enemy *e, const Room *room, float px, float py, float dt
         float a = SDL_randf() * 2.0f * SDL_PI_F, d = SDL_randf() * tuning.worm_aim_jitter;
         float x = px + cosf(a) * d, y = py + sinf(a) * d;
         room_clamp_to_floor(room, e->box.w * 0.5f + 16.0f, e->box.h * 0.5f + 16.0f, &x, &y);
+        /* Il sort toujours en perçant le parchemin : sur une case où un trou ne bouche aucun chemin
+         * (ou par un trou de ver déjà percé). */
+        static TileMask taken;   /* cases où un autre ver est déjà, ou va sortir */
+        int tx, ty;
+        if (room->layout) enemy_worm_tiles(pool, room->layout, e, taken);
+        if (room->layout && layout_worm_spot(room->layout, x, y, (const TileMask *)&taken, &tx, &ty)) {
+            SDL_FRect t = layout_tile_rect(room->layout, tx, ty);
+            x = t.x + t.w * 0.5f;
+            y = t.y + t.h * 0.5f;
+        } else {
+            room_find_free_point(room, e->box.w + 16.0f, e->box.h + 12.0f, &x, &y);
+        }
         e->box.x = e->prev_x = x - e->box.w * 0.5f;
         e->box.y = e->prev_y = y - e->box.h * 0.5f;
         worm_set_state(e, WORM_WARN, tuning.worm_warn_time);
         break;
     }
-    case WORM_WARN:   worm_set_state(e, WORM_EMERGE, tuning.worm_emerge_time); break;
+    case WORM_WARN:
+        e->surfaced = true;   /* il perce la surface : game.c y fait un trou */
+        worm_set_state(e, WORM_EMERGE, tuning.worm_emerge_time);
+        break;
     case WORM_EMERGE: worm_set_state(e, WORM_UP, tuning.worm_up_time); break;
     case WORM_UP:     worm_set_state(e, WORM_DIVE, tuning.worm_dive_time); break;
-    default:          worm_set_state(e, WORM_HIDDEN, rand_range(tuning.worm_hidden_min, tuning.worm_hidden_max)); break;
+    default:
+        worm_set_state(e, WORM_HIDDEN, rand_range(tuning.worm_hidden_min, tuning.worm_hidden_max));
+        break;
     }
 }
 
@@ -402,6 +446,7 @@ void enemy_update_all(EnemyPool *pool, const Room *room, float target_x, float t
         if (e->sing_timer > 0.0f) e->sing_timer -= dt;
         e->fire = false;
         e->dig = false;
+        e->surfaced = false;
         e->cry = false;
         if ((e->type == ENEMY_BABY || e->type == ENEMY_BOSS) && (e->cry_timer -= dt) <= 0.0f) {
             e->cry = true;
@@ -412,7 +457,7 @@ void enemy_update_all(EnemyPool *pool, const Room *room, float target_x, float t
         case ENEMY_BOSS:   boss_update(e, room, dt); break;
         case ENEMY_MONK:   monk_update(e, room, target_x, target_y, dt); break;
         case ENEMY_QUILL:  e->state_time += dt; quill_update(e, room, target_x, target_y, dt); break;
-        case ENEMY_WORM:   e->state_time += dt; worm_update(e, room, target_x, target_y, dt); break;
+        case ENEMY_WORM:   e->state_time += dt; worm_update(e, pool, room, target_x, target_y, dt); break;
         case ENEMY_RINGER: e->state_time += dt; ringer_update(e, room, target_x, target_y, dt); break;
         default:           baby_update(e, room, target_x, target_y, dt); break;
         }

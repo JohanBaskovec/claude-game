@@ -6,15 +6,17 @@
 #define BURST_TIME 0.18f   /* durée de l'éclat, s */
 
 /* Deux teintes par couleur : claire (gouttes, centre des taches) et sombre (bord). */
-static const SDL_Color LIGHT[3] = {
+static const SDL_Color LIGHT[SPLAT_COLOR_COUNT] = {
     [SPLAT_BLOOD] = { 168, 22, 28, 255 },
     [SPLAT_GREEN] = { 104, 170, 52, 255 },
     [SPLAT_INK]   = { 34, 36, 58, 255 },
+    [SPLAT_PAPER] = { 232, 220, 190, 255 },   /* pages arrachées */
 };
-static const SDL_Color DARK[3] = {
+static const SDL_Color DARK[SPLAT_COLOR_COUNT] = {
     [SPLAT_BLOOD] = { 104, 10, 16, 255 },
     [SPLAT_GREEN] = { 54, 104, 28, 255 },
     [SPLAT_INK]   = { 14, 14, 24, 255 },
+    [SPLAT_PAPER] = { 150, 130, 96, 255 },
 };
 
 static float rand_range(float a, float b)

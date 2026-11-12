@@ -135,7 +135,11 @@ void projectile_update_all(ProjectilePool *pool, const Room *room, float dt)
         SDL_FPoint pos = { pr->x, pr->y };
         if (!SDL_PointInRectFloat(&pos, &room->bounds)) {
             pr->active = false;   /* sortie par une porte ouverte */
-        } else if (pr->traveled >= pr->range || room_overlaps_solid(room, &box, !pr->spectral)) {
+        } else if (room_overlaps_solid(room, &box, !pr->spectral)) {
+            pr->active = false;
+            pr->ink_drop = pr->ink;
+            pr->stopped = true;
+        } else if (pr->traveled >= pr->range) {
             pr->active = false;
             pr->ink_drop = pr->ink;
         }

@@ -3,6 +3,7 @@
 #include "config.h"
 #include "decor.h"
 #include "minimap.h"
+#include "obstacle.h"
 
 #include <math.h>
 
@@ -86,7 +87,7 @@ static void free_player_from_props(Game *g)
                              g->player.box.w + 48.0f, g->player.box.h + 48.0f };
         bool blocked = false;
         for (int k = 0; k < g->room.prop_count; k++) blocked |= overlaps(&margin, &g->room.props[k]);
-        if (!blocked && !room_overlaps_wall(&g->room, &g->player.box)) return;
+        if (!blocked && !room_blocks_walk(&g->room, &g->player.box)) return;
     }
     place_player(g, cx, cy);
 }
@@ -315,6 +316,123 @@ static void drop_ink(Game *g, float x, float y)
 
 /* Tirs contre ennemis. Une note disparaît au premier ennemi touché ; les ondes et le rayon
  * traversent et touchent chaque ennemi une seule fois. */
+/* --- Obstacles (GDD §21) --------------------------------------------------------- */
+
+static RoomLayout *layout_of(Game *g)
+{
+    return &g->floor.rooms[g->room.index].layout;
+}
+
+/* Un obstacle se casse (ou une chandelle s'éteint) : éclats, flaque, parfois des royalties. */
+static void break_obstacle(Game *g, Obstacle *o)
+{
+    RoomLayout *L = layout_of(g);
+    float x, y;
+    obstacle_center(L, o, &x, &y);
+    o->alive = false;
+    switch (o->type) {
+    case OBST_BOOKS:    splatter_burst(&g->splatter, x, y, 14.0f, 0.8f, SPLAT_PAPER); break;
+    case OBST_CANDLE:   hazard_spawn_wax(&g->hazards, x, y + 2.0f); break;
+    case OBST_INKWELL:
+        splatter_burst(&g->splatter, x, y, 10.0f, 0.6f, SPLAT_INK);
+        hazard_spawn_ink(&g->hazards, x, y + 4.0f);
+        if (SDL_randf() < tuning.inkwell_coin_chance) pickup_spawn(&g->pickups, PICKUP_COIN, x, y + 10.0f);
+        break;
+    default: break;
+    }
+}
+
+/* Tirs contre obstacles : un encrier perd des points, une chandelle s'éteint. */
+static void resolve_shots_vs_obstacles(Game *g)
+{
+    RoomLayout *L = layout_of(g);
+    for (int i = 0; i < MAX_PROJECTILES; i++) {
+        Projectile *pr = &g->shots.items[i];
+        bool stopped = pr->stopped;
+        pr->stopped = false;
+        if ((!pr->active && !stopped) || pr->spectral || pr->kind == SHOT_BEAM) continue;   /* au-dessus des obstacles */
+        for (int k = 0; k < L->obstacle_count; k++) {
+            Obstacle *o = &L->obstacles[k];
+            Uint64 bit = (Uint64)1 << k;
+            if (!o->alive || (pr->obstacle_hits & bit)) continue;
+            if (o->type != OBST_INKWELL && o->type != OBST_CANDLE) continue;
+            SDL_FRect b = obstacle_rect(L, o);
+            b.x -= 1.0f;
+            b.y -= 1.0f;
+            b.w += 2.0f;
+            b.h += 2.0f;
+            if (!projectile_hits_box(pr, &b)) continue;
+            pr->obstacle_hits |= bit;
+            o->hp -= o->type == OBST_CANDLE ? o->hp : pr->damage;
+            if (o->hp <= 1e-4f) break_obstacle(g, o);
+            if (!projectile_pierces(pr)) {
+                pr->active = false;
+                break;
+            }
+        }
+    }
+}
+
+/* Le métronome casse tout ce qui se casse dans son rayon. */
+static void explode_obstacles(Game *g, float bx, float by)
+{
+    RoomLayout *L = layout_of(g);
+    for (int k = 0; k < L->obstacle_count; k++) {
+        Obstacle *o = &L->obstacles[k];
+        if (!o->alive || !obstacle_blocks_shots(o->type)) continue;
+        float x, y;
+        obstacle_center(L, o, &x, &y);
+        float r = tuning.bomb_radius + 18.0f;
+        if ((x - bx) * (x - bx) + (y - by) * (y - by) <= r * r) break_obstacle(g, o);
+    }
+}
+
+/* Chandelles allumées (brûlent au contact) et aiguilles sorties (piquent). */
+static void resolve_obstacles_vs_player(Game *g)
+{
+    const RoomLayout *L = layout_of(g);
+    SDL_FRect pb = g->player.box;
+    for (int k = 0; k < L->obstacle_count; k++) {
+        const Obstacle *o = &L->obstacles[k];
+        if (!o->alive) continue;
+        SDL_FRect b = obstacle_rect(L, o);
+        if (o->type == OBST_CANDLE) {
+            SDL_FRect near = { b.x - 3.0f, b.y - 3.0f, b.w + 6.0f, b.h + 6.0f };
+            if (overlaps(&near, &pb)) player_hurt(&g->player, tuning.candle_damage);
+        } else if (o->type == OBST_NEEDLES && needle_stage(o, g->time) == 2 && overlaps(&b, &pb)) {
+            player_hurt(&g->player, tuning.needle_damage);
+        }
+    }
+}
+
+/* Le ver perce la surface : il laisse toujours un trou dans le parchemin (il a choisi une case où la
+ * règle d'accès le permet, layout_worm_spot). Ceux qui se tenaient là sont poussés sur le bord. */
+static void worm_hole(Game *g, const Enemy *w)
+{
+    RoomLayout *L = layout_of(g);
+    float cx, cy;
+    enemy_center(w, &cx, &cy);
+    int tx, ty;
+    static TileMask pending;   /* les autres vers qui vont sortir : leurs trous comptent déjà */
+    enemy_worm_tiles(&g->enemies, L, w, pending);
+    if (!layout_tile_at(L, cx, cy, &tx, &ty) || !layout_add_worm_hole(L, tx, ty, (const TileMask *)&pending)) return;
+    if (room_blocks_walk(&g->room, &g->player.box)) {
+        float px, py;
+        player_center(&g->player, &px, &py);
+        room_find_free_point(&g->room, g->player.box.w, g->player.box.h, &px, &py);
+        place_player(g, px, py);
+    }
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        Enemy *e = &g->enemies.items[i];
+        if (!e->active || e->type == ENEMY_WORM || !room_blocks_walk(&g->room, &e->box)) continue;
+        float ex, ey;
+        enemy_center(e, &ex, &ey);
+        room_find_free_point(&g->room, e->box.w, e->box.h, &ex, &ey);
+        e->box.x = e->prev_x = ex - e->box.w * 0.5f;
+        e->box.y = e->prev_y = ey - e->box.h * 0.5f;
+    }
+}
+
 static void resolve_shots_vs_enemies(Game *g)
 {
     for (int i = 0; i < MAX_PROJECTILES; i++) {
@@ -440,6 +558,7 @@ static void boss_landed(Game *g)
 static void explode(Game *g, const Bomb *b)
 {
     audio_play(SOUND_EXPLOSION, 1.0f);
+    explode_obstacles(g, b->x, b->y);
     float R = tuning.bomb_radius;
     for (int j = 0; j < MAX_ENEMIES; j++) {
         Enemy *e = &g->enemies.items[j];
@@ -575,6 +694,8 @@ void game_step(Game *g, const Input *in, float dt)
 
     float aim_x, aim_y;
     aim_direction(g, in, &aim_x, &aim_y);
+    g->player.slipping = hazard_in(&g->hazards, HAZARD_WAX, g->player.box.x + g->player.box.w * 0.5f,
+                                   g->player.box.y + g->player.box.h * 0.5f);
     PlayerFire shot = player_update(&g->player, in, aim_x, aim_y, &g->room, weapon_fire_rate(&g->player.stats),
                                     weapon_charge_time(&g->player.stats), dt);
     float px, py;
@@ -585,10 +706,12 @@ void game_step(Game *g, const Input *in, float dt)
         g->player.stats.bombs--;
     }
 
+    room_update_nav(&g->room, px, py);   /* les ennemis contournent obstacles et trous */
     enemy_update_all(&g->enemies, &g->room, px, py, dt);
     for (int i = 0; i < MAX_ENEMIES; i++) {
         const Enemy *e = &g->enemies.items[i];
         if (!e->active) continue;
+        if (e->surfaced) worm_hole(g, e);
         if (e->landed) boss_landed(g);
         if (e->fire) enemy_fire(g, e, px, py);
         if (e->dig) audio_play(SOUND_DIG, 1.0f);
@@ -598,6 +721,7 @@ void game_step(Game *g, const Input *in, float dt)
         }
     }
     projectile_update_all(&g->shots, &g->room, dt);
+    resolve_shots_vs_obstacles(g);
     update_bullets(g, dt);
     splatter_update(&g->splatter, &g->room, dt);
 
@@ -635,9 +759,11 @@ void game_step(Game *g, const Input *in, float dt)
 
     resolve_shots_vs_enemies(g);
     resolve_enemies_vs_player(g);
+    resolve_obstacles_vs_player(g);
     if (shot.fire) {
         fire(g, shot);
         resolve_shots_vs_enemies(g);   /* la cloche et l'orgue frappent dès le tir */
+        resolve_shots_vs_obstacles(g);
     }
     resolve_offers(g);
 
@@ -680,13 +806,13 @@ void game_step(Game *g, const Input *in, float dt)
 }
 
 /* Ce qui est trié par profondeur : on dessine d'abord ce dont le pied est le plus haut. */
-typedef enum DrawKind { DRAW_PLAYER, DRAW_ENEMY, DRAW_LUTRIN, DRAW_BOMB, DRAW_PICKUP } DrawKind;
+typedef enum DrawKind { DRAW_PLAYER, DRAW_ENEMY, DRAW_LUTRIN, DRAW_BOMB, DRAW_PICKUP, DRAW_OBSTACLE } DrawKind;
 typedef struct DrawItem {
     float    y;
     DrawKind kind;
     int      index;
 } DrawItem;
-#define MAX_DRAW_ITEMS (1 + MAX_ENEMIES + ROOM_MAX_PROPS + MAX_BOMBS + MAX_PICKUPS)
+#define MAX_DRAW_ITEMS (1 + MAX_ENEMIES + ROOM_MAX_PROPS + MAX_BOMBS + MAX_PICKUPS + MAX_OBSTACLES)
 
 static void push_item(DrawItem *items, int *n, float y, DrawKind kind, int index)
 {
@@ -716,6 +842,10 @@ static void render_prop(const Game *g, SDL_Renderer *r, int i, Camera cam)
 static void render_room_contents(const Game *g, SDL_Renderer *r, float alpha, Camera cam)
 {
     room_render(&g->room, r, cam);
+    const RoomLayout *L = g->room.layout;
+    for (int i = 0; L && i < L->obstacle_count; i++) {
+        if (obstacle_flat(L->obstacles[i].type)) obstacle_render(L, &L->obstacles[i], r, cam, g->time);
+    }
     splatter_render_ground(&g->splatter, r, alpha, cam);
 
     /* Au sol : ombres des briques et des ennemis. */
@@ -741,6 +871,10 @@ static void render_room_contents(const Game *g, SDL_Renderer *r, float alpha, Ca
     for (int i = 0; i < MAX_PICKUPS; i++) {
         if (g->pickups.items[i].active) push_item(items, &n, pickup_feet_y(&g->pickups.items[i], alpha), DRAW_PICKUP, i);
     }
+    for (int i = 0; L && i < L->obstacle_count; i++) {
+        const Obstacle *o = &L->obstacles[i];
+        if (o->alive && !obstacle_flat(o->type)) push_item(items, &n, obstacle_feet_y(L, o), DRAW_OBSTACLE, i);
+    }
     for (int k = 0; k < n; k++) {
         int i = items[k].index;
         switch (items[k].kind) {
@@ -749,6 +883,7 @@ static void render_room_contents(const Game *g, SDL_Renderer *r, float alpha, Ca
         case DRAW_LUTRIN: render_prop(g, r, i, cam); break;
         case DRAW_BOMB:   bomb_render(&g->bombs.items[i], r, cam); break;
         case DRAW_PICKUP: pickup_render(&g->pickups.items[i], r, alpha, cam); break;
+        case DRAW_OBSTACLE: obstacle_render(L, &L->obstacles[i], r, cam, g->time); break;
         }
     }
 
@@ -760,9 +895,92 @@ static void render_room_contents(const Game *g, SDL_Renderer *r, float alpha, Ca
     for (int i = 0; i < MAX_BOMBS; i++) bomb_render_explosion(&g->bombs.items[i], r, cam);
 }
 
+/* ------------------------------------------------------------ salles sombres (GDD §21) */
+#define DARK_STEP   16                       /* maille du voile noir, px écran */
+#define DARK_COLS   (GAME_W / DARK_STEP + 1)
+#define DARK_ROWS   (GAME_H / DARK_STEP + 2)
+#define MAX_LIGHTS  (MAX_PROJECTILES + MAX_OBSTACLES + 1)
+
+typedef struct Light { float x, y, r; } Light;
+
+/* Voile noir sur la salle (coordonnées écran), percé autour des lumières : un maillage
+ * dont chaque sommet a sa propre transparence, que la carte graphique lisse entre les sommets. */
+static void render_darkness(SDL_Renderer *r, const Room *room, Camera cam, const Light *lights, int n)
+{
+    static SDL_Vertex verts[DARK_COLS * DARK_ROWS];
+    static int idx[(DARK_COLS - 1) * (DARK_ROWS - 1) * 6];
+    float x0 = SDL_max(floorf(room->bounds.x - cam.x), 0.0f), y0 = SDL_max(floorf(room->bounds.y - cam.y), 0.0f);
+    float x1 = SDL_min(room->bounds.x + room->bounds.w - cam.x, (float)GAME_W);
+    float y1 = SDL_min(room->bounds.y + room->bounds.h - cam.y, (float)GAME_H);
+    if (x1 <= x0 || y1 <= y0) return;
+    int cols = SDL_min((int)ceilf((x1 - x0) / DARK_STEP) + 1, DARK_COLS);
+    int rows = SDL_min((int)ceilf((y1 - y0) / DARK_STEP) + 1, DARK_ROWS);
+    for (int j = 0; j < rows; j++) {
+        for (int i = 0; i < cols; i++) {
+            float x = SDL_min(x0 + (float)(i * DARK_STEP), x1), y = SDL_min(y0 + (float)(j * DARK_STEP), y1);
+            float lit = 0.0f;
+            for (int k = 0; k < n; k++) {
+                float dx = x - lights[k].x, dy = (y - lights[k].y) * 1.25f;   /* halo un peu aplati */
+                float d2 = dx * dx + dy * dy, r2 = lights[k].r * lights[k].r;
+                if (d2 >= r2) continue;
+                float t = 1.0f - sqrtf(d2 / r2);
+                lit = SDL_max(lit, t * t * (3.0f - 2.0f * t));
+            }
+            SDL_Vertex *v = &verts[j * cols + i];
+            v->position = (SDL_FPoint){ x, y };
+            v->color = (SDL_FColor){ 0.03f, 0.02f, 0.04f, tuning.darkness * (1.0f - lit) };
+            v->tex_coord = (SDL_FPoint){ 0.0f, 0.0f };
+        }
+    }
+    int m = 0;
+    for (int j = 0; j + 1 < rows; j++) {
+        for (int i = 0; i + 1 < cols; i++) {
+            int a = j * cols + i, b = a + 1, c = a + cols, d = c + 1;
+            idx[m++] = a; idx[m++] = b; idx[m++] = c;
+            idx[m++] = b; idx[m++] = d; idx[m++] = c;
+        }
+    }
+    SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+    SDL_RenderGeometry(r, NULL, verts, rows * cols, idx, m);
+}
+
+/* Chandelles allumées de la salle, qui vacillent. */
+static int candle_lights(const RoomLayout *L, Camera cam, float time, Light *out, int n)
+{
+    for (int i = 0; L && i < L->obstacle_count && n < MAX_LIGHTS; i++) {
+        const Obstacle *o = &L->obstacles[i];
+        if (!o->alive || o->type != OBST_CANDLE) continue;
+        float x, y;
+        obstacle_center(L, o, &x, &y);
+        float flicker = 1.0f + 0.06f * sinf(time * 13.0f + (float)i * 2.1f) + 0.04f * sinf(time * 31.0f + (float)i);
+        out[n++] = (Light){ x - cam.x, y - 30.0f - cam.y, tuning.light_candle * flicker };
+    }
+    return n;
+}
+
+/* Lumières de la salle courante : Amadeus, les chandelles, les notes qui volent. */
+static void render_room_darkness(const Game *g, SDL_Renderer *r, float alpha, Camera cam)
+{
+    if (!g->room.layout || !g->room.layout->dark) return;
+    static Light lights[MAX_LIGHTS];
+    int n = 0;
+    const Player *p = &g->player;
+    float px = p->prev_x + (p->box.x - p->prev_x) * alpha + p->box.w * 0.5f;
+    float py = p->prev_y + (p->box.y - p->prev_y) * alpha;
+    lights[n++] = (Light){ px - cam.x, py - 16.0f - cam.y, tuning.light_player };
+    n = candle_lights(g->room.layout, cam, g->time, lights, n);
+    for (int i = 0; i < MAX_PROJECTILES && n < MAX_LIGHTS; i++) {
+        const Projectile *pr = &g->shots.items[i];
+        if (!pr->active || pr->kind != SHOT_NOTE) continue;
+        float x = pr->prev_x + (pr->x - pr->prev_x) * alpha, y = pr->prev_y + (pr->y - pr->prev_y) * alpha;
+        lights[n++] = (Light){ x - cam.x, y - tuning.shot_height - cam.y, tuning.light_note * pr->size };
+    }
+    render_darkness(r, &g->room, cam, lights, n);
+}
+
 void game_render(const Game *g, SDL_Renderer *r, float alpha)
 {
-    decor_set_floor(g->floor.seed);
+    decor_set_floor(&g->floor);
     Camera cam = game_camera(g, alpha);
     const Transition *t = &g->transition;
 
@@ -782,9 +1000,18 @@ void game_render(const Game *g, SDL_Renderer *r, float alpha)
         Camera new_cam = { cam.x - sx * (1.0f - e), cam.y - sy * (1.0f - e) };
         room_render(&t->from, r, old_cam);
         for (int i = 0; i < t->from.prop_count; i++) room_render_prop(&t->from, i, r, old_cam);
+        const RoomLayout *FL = t->from.layout;
+        for (int i = 0; FL && i < FL->obstacle_count; i++) obstacle_render(FL, &FL->obstacles[i], r, old_cam, g->time);
         render_room_contents(g, r, alpha, new_cam);
+        if (FL && FL->dark) {
+            static Light from_lights[MAX_LIGHTS];
+            int n = candle_lights(FL, old_cam, g->time, from_lights, 0);
+            render_darkness(r, &t->from, old_cam, from_lights, n);
+        }
+        render_room_darkness(g, r, alpha, new_cam);
     } else {
         render_room_contents(g, r, alpha, cam);
+        render_room_darkness(g, r, alpha, cam);
     }
 
     hud_render(&g->hud, r, &g->player.stats);

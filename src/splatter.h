@@ -12,7 +12,7 @@
  * Mort des ennemis (GDD §18) : un éclat, des gouttes qui retombent, et des taches
  * qui restent sur le sol de la salle. Purement visuel.
  */
-typedef enum SplatColor { SPLAT_BLOOD, SPLAT_GREEN, SPLAT_INK } SplatColor;
+typedef enum SplatColor { SPLAT_BLOOD, SPLAT_GREEN, SPLAT_INK, SPLAT_PAPER, SPLAT_COLOR_COUNT } SplatColor;
 
 typedef struct Drop {
     bool       active;

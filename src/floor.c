@@ -267,12 +267,21 @@ static Uint64 mix_seed(Uint64 x)
     return x ^ (x >> 31);
 }
 
+/* Trous et obstacles de chaque salle (GDD §21), avec leur propre suite de tirages :
+ * la topologie de l'étage reste la même qu'avant pour une graine donnée. */
+static void generate_layouts(Floor *f)
+{
+    Uint64 rng = mix_seed(f->seed ^ 0x6c61796f7574ull);
+    for (int i = 0; i < f->room_count; i++) layout_generate(&f->rooms[i].layout, &f->rooms[i], &rng);
+}
+
 void floor_generate(Floor *f, Uint64 seed)
 {
     Uint64 rng = mix_seed(seed);
     f->seed = seed;
     for (int tries = 0; tries < 1000; tries++) {
         if (attempt(f, &rng)) {
+            generate_layouts(f);
             return;
         }
     }
@@ -281,4 +290,5 @@ void floor_generate(Floor *f, Uint64 seed)
     compute_doors(f);
     compute_depths(f);
     if (f->boss < 0) f->boss = f->start;
+    generate_layouts(f);
 }

@@ -5,8 +5,10 @@
 #include <string.h>
 
 /*
- * Portage en C de docs/concept/outils_concept/room_base.py (murs, portes, dalles)
+ * Portage en C de docs/concept/outils_concept/room_base.py (géométrie des murs et des portes)
  * et page.py (mise en page du manuscrit). Tout est en coordonnées « page » du GDD.
+ * Phase 12 (GDD §21) : sol en parchemin avec sa réglure, murs peints façon tables des canons,
+ * trous dans le parchemin, petites choses oubliées sur la page et marginalia.
  */
 
 /* ------------------------------------------------------------ double page (GDD §9) */
@@ -21,16 +23,13 @@
 #define STITCH_STEP 120.0f                          /* points de couture de la reliure */
 
 /* ------------------------------------------------------------ murs et portes (room_base.py) */
-#define COURSES     5           /* rangs de briques dans la profondeur du mur */
-#define BRICKS_H    20          /* briques par cellule, murs du haut et du bas */
-#define BRICKS_V    10          /* briques par cellule, murs de côté */
+#define BRICKS_H    6           /* arcades par cellule, murs du haut et du bas */
+#define BRICKS_V    3           /* arcades par cellule, murs de côté */
 #define DOOR_T0     0.14f       /* la porte commence un peu sous le chaperon */
 #define DOOR_ARCH   0.40f       /* hauteur de l'arc (en fraction de la porte) */
 #define DOOR_HALF_H 0.065f      /* demi-largeur de la porte, murs du haut et du bas (≈ 50 px au pied) */
 #define DOOR_HALF_V 0.11f       /* idem murs de côté (≈ 40 px au pied) */
 #define FRAME_GROW  0.30f       /* épaisseur de l'encadrement de claveaux */
-#define SLAB_W      72.0f       /* dalles du sol */
-#define SLAB_H      46.0f
 
 #define TEX_MAX_W   (2 * (int)CELL_W + 2 * (int)WALL_SIDE)
 #define TEX_MAX_H   (2 * (int)CELL_H + (int)WALL_TOP + (int)WALL_BOTTOM)
@@ -62,7 +61,7 @@ static bool  noise_ready;
 
 enum { NZ_GRAIN, NZ_CHIP, NZ_WOOD, NZ_FLOOR, NZ_WEAR, NZ_COUNT };
 static int    noise_off[NZ_COUNT][2];   /* chaque usage lit la table à un endroit différent */
-static Uint32 floor_hash;               /* graine de l'étage, pour les dalles et les briques */
+static Uint32 floor_hash;               /* graine de l'étage, pour les petites choses de la page */
 
 static int wrap(int v, int n)
 {
@@ -251,6 +250,26 @@ static int syllabify(const char *w, int n, int *starts)
     return count;
 }
 
+/* Trous de la double page (en cases de 48 x 40), pour que le texte les contourne. */
+#define PAGE_TX (FLOOR_COLS * CELL_TILES_X)
+#define PAGE_TY (FLOOR_ROWS * CELL_TILES_Y)
+static Uint8 page_holes[PAGE_TY][PAGE_TX];
+
+/* Si [x0, x1] sur la ligne de base `base` (neumes compris) touche un trou, renvoie le x
+ * juste après ce trou ; sinon -1. */
+static float hole_skip(float x0, float x1, float base)
+{
+    int ty0 = SDL_max((int)floorf((base - 46.0f) / TILE_H), 0), ty1 = SDL_min((int)floorf((base + 8.0f) / TILE_H), PAGE_TY - 1);
+    int tx0 = SDL_max((int)floorf(x0 / TILE_W), 0), tx1 = SDL_min((int)floorf(x1 / TILE_W), PAGE_TX - 1);
+    float skip = -1.0f;
+    for (int ty = ty0; ty <= ty1; ty++) {
+        for (int tx = tx0; tx <= tx1; tx++) {
+            if (page_holes[ty][tx]) skip = SDL_max(skip, (float)(tx + 1) * TILE_W + 6.0f);
+        }
+    }
+    return skip;
+}
+
 typedef struct Layout {
     float   x, x0, x1;
     int     line;
@@ -271,10 +290,23 @@ static void newline(Layout *L)
     if (L->line == L->res_line && L->x >= L->res_x0 && L->x < L->res_x1) L->x = L->res_x1;
 }
 
+/* Place pour un élément de largeur w : après la lettrine, à la ligne si besoin, et jamais sur un trou. */
 static void fit(Layout *L, float w)
 {
-    if (L->line == L->res_line && L->x < L->res_x1 && L->x + w > L->res_x0) L->x = L->res_x1;
-    if (L->x + w > L->x1) newline(L);
+    for (int guard = 0; guard < 256; guard++) {
+        if (L->line == L->res_line && L->x < L->res_x1 && L->x + w > L->res_x0) L->x = L->res_x1;
+        if (L->x + w > L->x1) {
+            newline(L);
+            if (L->line >= LINES - 1) return;
+            continue;
+        }
+        float skip = hole_skip(L->x, L->x + w, baseline(L));
+        if (skip > L->x) {
+            L->x = skip;
+            continue;
+        }
+        return;
+    }
 }
 
 static int rand_int(Layout *L, int lo, int hi)
@@ -472,7 +504,17 @@ static void draw_page_ink(const Coverage *ink, const Coverage *red, int from, in
         float lx = op->x - ink->ox, ly = op->y - ink->oy;
         switch (op->kind) {
         case OP_SYL:    font_draw(FONT_TEXT, s, lx, ly - 17.0f, ink->buf, ink->w, ink->h); break;
-        case OP_NEUME:  draw_neume(ink, op->neume, op->x, op->y); break;
+        case OP_NEUME:
+            draw_neume(ink, op->neume, op->x, op->y);
+            if (hash3(i, 7, (int)(floor_hash & 0xffff)) % 89 == 0) {
+                /* Neume raturé par le copiste : un gribouillis par-dessus. */
+                float w = NEUME_W[op->neume];
+                for (int k = 0; k < 4; k++) {
+                    cov_segment(ink, op->x - 1.0f + w * (float)k / 4.0f, op->y + ((k & 1) ? 11.0f : -1.0f),
+                                op->x - 1.0f + w * (float)(k + 1) / 4.0f, op->y + ((k & 1) ? -1.0f : 11.0f), 0.7f);
+                }
+            }
+            break;
         case OP_RUBRIC: font_draw(FONT_RUBRIC, s, lx, ly - 11.0f, red->buf, red->w, red->h); break;
         case OP_VERSAL: font_draw(FONT_VERSAL, s, lx, ly - 35.0f, red->buf, red->w, red->h); break;
         default:        font_draw(FONT_CAP, s, lx, ly, red->buf, red->w, red->h); break;
@@ -496,8 +538,8 @@ typedef struct WallSeg {
     float base, depth;      /* bord du sol ; profondeur du mur */
     float lo, hi, klo, khi;
     float vlo, vhi;
-    int   bricks;           /* briques par cellule */
-    int   brick0, row_id;   /* indices dans le monde, pour que les briques se raccordent d'une cellule à l'autre */
+    int   bricks;           /* arcades par cellule */
+    int   brick0, row_id;   /* indices dans le monde, pour que les arcades se raccordent d'une cellule à l'autre */
     int   door;             /* porte de ce pan (indice dans room->doors), -1 si aucune */
     float door_half;
 } WallSeg;
@@ -622,58 +664,102 @@ static void put_rgb(Uint8 *o, float r, float g, float b, Uint8 a)
     o[3] = a;
 }
 
-/* Briques en perspective : biseaux clairs et sombres, joints, éclats, chaperon au sommet. */
-static void brick_color(const WallSeg *w, float x, float y, float t, float along, Uint8 *o)
+/* Couleurs de l'enluminure (GDD §21). */
+static const float GOLD[3]  = { 206, 162, 74 };
+static const float LAPIS[3] = { 44, 70, 138 };
+static const float VERMIL[3] = { 166, 50, 38 };
+static const float VERT[3]  = { 58, 108, 78 };
+static const float PEARL[3] = { 236, 226, 198 };
+static const float WALL_INK[3] = { 38, 26, 22 };
+
+static void set3(float *c, const float *v)
+{
+    c[0] = v[0]; c[1] = v[1]; c[2] = v[2];
+}
+
+/*
+ * Mur peint façon tables des canons : colonnes marbrées (chapiteau et base dorés) qui portent
+ * des arcs ; fond bleu lapis sous les arcs, écoinçons vermillon, frise de perles en haut,
+ * bord doré cerné d'encre. t va du bord extérieur (0) au pied du mur (1).
+ */
+static void wall_color(const WallSeg *w, float x, float y, float t, float along, Uint8 *o)
 {
     float s = 1.0f - t;
     float lo = w->lo + w->klo * s, hi = w->hi + w->khi * s, len = hi - lo;
     float u = (along - lo) / len;
     float g = fbm(NZ_GRAIN, x, y);
+    float du = 1.0f / len, dt = 1.0f / w->depth;   /* un pixel, en u et en t */
+    float c[3];
 
-    if (t < 0.075f) {   /* chaperon */
-        float k = 0.85f + 0.3f * g;
-        put_rgb(o, 46 * k, 37 * k, 34 * k, 255);
-        return;
-    }
-    if (t < 0.095f) {   /* arête */
-        put_rgb(o, 92, 80, 70, 255);
-        return;
-    }
-    float ct = t * COURSES, ci = floorf(ct), fv = ct - ci;
-    float wv = u * (float)w->bricks + 0.5f * (float)((int)ci & 1);
-    float bi = floorf(wv), fu = wv - bi;
-    float mu = 2.0f * (float)w->bricks / len, mv = 2.0f * COURSES / w->depth;
-    int brick = (int)bi + w->brick0, course = (int)ci;
-    float bh = hash01(brick, course, w->row_id ^ (int)(floor_hash & 0xffff));
-    float r = 112 + bh * 26 - 13, gr = 98 + bh * 22 - 11, b = 86 + bh * 18 - 9;
-    float k = 0.86f + 0.28f * g;
-    bool mortar = fu < mu || fv < mv;
-    if (mortar) {
-        float m = 0.9f + 0.2f * g;
-        r = 54 * m; gr = 44 * m; b = 39 * m;
+    float cu = u * (float)w->bricks, ci = floorf(cu), fu = cu - ci;   /* position entre deux colonnes */
+    float pu = du * (float)w->bricks;
+    float col_d = SDL_min(fu, 1.0f - fu);                             /* distance à l'axe de la colonne */
+    const float shaft = 0.075f;
+    int column = (int)ci + w->brick0 + (fu > 0.5f ? 1 : 0);
+
+    /* Arc entre deux colonnes : sommet à t = 0.30, retombées sur les chapiteaux à t = 0.44. */
+    float a = 2.0f * fu - 1.0f;
+    float arch_t = 0.30f + 0.14f * (1.0f - sqrtf(SDL_max(1.0f - a * a, 0.0f)));
+
+    if (t < 0.05f) {
+        set3(c, GOLD);                                                /* bord doré */
+        if (t < dt * 1.5f || t > 0.05f - dt * 1.2f) set3(c, WALL_INK);
+    } else if (t < 0.20f) {
+        set3(c, VERMIL);                                              /* frise de perles */
+        float pv = fmodf(u * (float)w->bricks * 4.0f, 1.0f), tv = (t - 0.125f) / 0.04f;
+        float pr = (pv - 0.5f) * (pv - 0.5f) / 0.06f + tv * tv;
+        if (pr < 1.0f) set3(c, PEARL);
+        else if (pr < 1.6f) set3(c, WALL_INK);
+        if (t > 0.20f - dt * 1.2f) set3(c, WALL_INK);
+    } else if (col_d < shaft) {
+        /* Colonne : marbre rouge ou vert, chapiteau et base dorés. */
+        if (t < 0.27f || (t > 0.84f && t < 0.92f)) {
+            set3(c, GOLD);
+            if (fabsf(t - 0.27f) < dt || fabsf(t - 0.84f) < dt || fabsf(t - 0.92f) < dt) set3(c, WALL_INK);
+        } else {
+            const float *m = (column & 1) ? VERMIL : VERT;
+            float vein = sinf(along * 0.35f + t * 9.0f + fbm(NZ_WOOD, x, y) * 8.0f);
+            float k = 0.85f + 0.25f * vein * vein;
+            c[0] = m[0] * k; c[1] = m[1] * k; c[2] = m[2] * k;
+        }
+        if (col_d > shaft - pu * 1.2f) set3(c, WALL_INK);
+    } else if (t < arch_t) {
+        set3(c, VERMIL);                                              /* écoinçon, avec un point d'or */
+        float ex = (fu - 0.5f) * 12.0f, ey = (t - 0.245f) / dt / 6.0f;
+        if (fabsf(fu - 0.5f) > 0.25f && ex * ex * 0.02f + ey * ey < 0.25f) set3(c, GOLD);
+    } else if (t < arch_t + 0.035f) {
+        set3(c, GOLD);                                                /* l'arc */
+        if (t < arch_t + dt * 1.2f || t > arch_t + 0.035f - dt * 1.2f) set3(c, WALL_INK);
+    } else if (t < 0.92f) {
+        set3(c, LAPIS);                                               /* fond bleu, constellé */
+        float k = 0.9f + 0.18f * fbm(NZ_FLOOR, x, y);
+        c[0] *= k; c[1] *= k; c[2] *= k;
+        float sx = floorf(x / 9.0f), sy = floorf(y / 9.0f);
+        if (hash01((int)sx, (int)sy, 77) < 0.035f && fmodf(x, 9.0f) < 1.5f && fmodf(y, 9.0f) < 1.5f) set3(c, PEARL);
     } else {
-        if (fv < mv * 2.4f || fu < mu * 1.6f) k *= 1.13f;            /* biseau éclairé */
-        else if (fv > 1.0f - mv * 1.6f || fu > 1.0f - mu * 1.2f) k *= 0.8f;   /* biseau dans l'ombre */
-        if (hash01(brick, course, w->row_id * 7 + 3) < 0.08f && fbm(NZ_CHIP, x, y) > 0.62f) k *= 0.78f;   /* éclat */
-        r *= k; gr *= k; b *= k;
+        set3(c, VERT);                                                /* soubassement */
+        if (t < 0.92f + dt * 1.2f || t > 1.0f - dt * 1.5f) set3(c, WALL_INK);
     }
-    float depth = 0.5f + 0.5f * t;   /* plus sombre vers le haut du mur */
-    put_rgb(o, r * depth, gr * depth, b * depth, 255);
+    /* Peint sur le parchemin : un peu de grain, plus sombre vers le haut du mur. */
+    float k = (0.9f + 0.18f * g) * (0.62f + 0.38f * t);
+    put_rgb(o, c[0] * k, c[1] * k, c[2] * k, 255);
 }
 
-/* Encadrement : claveaux rayonnants dans l'arc, blocs droits en dessous. */
+/* Encadrement : claveaux peints, vermillon et blanc en alternance, joints à l'encre. */
 static void frame_color(const WallSeg *w, float x, float y, float t, float du, float dt, Uint8 *o)
 {
+    (void)w;
     float theta = atan2f((DOOR_ARCH - dt) / DOOR_ARCH, du);
     float seg = theta / (SDL_PI_F / 9.0f);
     float g = fbm(NZ_GRAIN, x, y);
-    float k = (0.85f + 0.3f * g) * (0.92f + 0.14f * hash01((int)floorf(seg), (int)floorf(dt * 6.0f), w->row_id));
-    float r = 150 * k, gr = 140 * k, b = 128 * k;
-    bool joint_arch = dt < DOOR_ARCH && fabsf(seg - roundf(seg)) < 0.07f;
-    bool joint_jamb = dt >= DOOR_ARCH && fabsf(dt * 6.0f - roundf(dt * 6.0f)) < 0.05f;
-    if (joint_arch || joint_jamb) { r = 70; gr = 60; b = 54; }
-    float shade = 0.62f + 0.38f * t;
-    put_rgb(o, r * shade, gr * shade, b * shade, 255);
+    int block = dt < DOOR_ARCH ? (int)floorf(seg) : 100 + (int)floorf(dt * 6.0f);
+    const float *c = (block & 1) ? VERMIL : PEARL;
+    float r = c[0], gr = c[1], b = c[2];
+    bool joint_arch = dt < DOOR_ARCH && fabsf(seg - roundf(seg)) < 0.06f;
+    bool joint_jamb = dt >= DOOR_ARCH && fabsf(dt * 6.0f - roundf(dt * 6.0f)) < 0.04f;
+    if (joint_arch || joint_jamb) { r = WALL_INK[0]; gr = WALL_INK[1]; b = WALL_INK[2]; }
+    float k = (0.9f + 0.16f * g) * (0.66f + 0.34f * t);
+    put_rgb(o, r * k, gr * k, b * k, 255);
 }
 
 /* Porte ouverte : le passage plonge dans le noir. */
@@ -712,6 +798,8 @@ enum { L_VOID, L_FLOOR, L_WALL, L_FRAME, L_WOOD };
 #define LABEL_KIND(l) ((l) & 15)
 #define LABEL_DOOR(l) ((l) >> 4)
 
+#define MAX_HOLE_TEX (LAYOUT_W * LAYOUT_H)   /* un trou de ver par case au pire */
+
 typedef struct RoomTex {
     Uint64       gen;
     SDL_Texture *tex;
@@ -719,6 +807,12 @@ typedef struct RoomTex {
     int          door_count;
     SDL_Texture *door_tex[ROOM_MAX_DOORS];
     SDL_FRect    door_rect[ROOM_MAX_DOORS];   /* coordonnées page */
+    bool         holes_built;                 /* trous du parchemin, posés par-dessus le sol */
+    int          holes_version;               /* RoomLayout.version au moment où ils ont été dessinés */
+    int          hole_count;
+    SDL_Texture *hole_tex[MAX_HOLE_TEX];
+    SDL_FRect    hole_rect[MAX_HOLE_TEX];
+    Uint8        worm_drawn[LAYOUT_H][LAYOUT_W];   /* trous de ver déjà dans une texture */
 } RoomTex;
 
 static RoomTex       cache[FLOOR_MAX_ROOMS];
@@ -731,12 +825,23 @@ static Uint8 ink_buf[TEX_MAX_W * TEX_MAX_H];
 static Uint8 red_buf[TEX_MAX_W * TEX_MAX_H];
 static Uint8 door_px[DOOR_BUF * 4];
 
+static void free_holes(RoomTex *rt)
+{
+    for (int i = 0; i < rt->hole_count; i++) {
+        if (rt->hole_tex[i]) SDL_DestroyTexture(rt->hole_tex[i]);
+    }
+    rt->hole_count = 0;
+    rt->holes_built = false;
+    SDL_memset(rt->worm_drawn, 0, sizeof rt->worm_drawn);
+}
+
 static void free_tex(RoomTex *rt)
 {
     if (rt->tex) SDL_DestroyTexture(rt->tex);
     for (int i = 0; i < rt->door_count; i++) {
         if (rt->door_tex[i]) SDL_DestroyTexture(rt->door_tex[i]);
     }
+    free_holes(rt);
     *rt = (RoomTex){ 0 };
 }
 
@@ -753,29 +858,53 @@ static SDL_Texture *upload(SDL_Renderer *r, const Uint8 *px, int w, int h, bool 
     return t;
 }
 
-/* Dalles du sol, ombre des murs, vignette, creux de la reliure. */
+/* Parchemin : peau crème au grain fin, follicules, taches, réglure à la pointe sèche
+ * et piqûres dans la marge ; ombre des murs, bords de page et creux de la reliure. */
 static void floor_color(const RoomCells *rc, const SDL_FRect *fb, float x, float y, int cx, int cy, Uint8 *o)
 {
-    float row = floorf(y / SLAB_H);
-    float off = ((int)row & 1) ? SLAB_W * 0.5f : 0.0f;
-    float col = floorf((x + off) / SLAB_W);
-    float sv = hash01((int)col, (int)row, (int)(floor_hash >> 8));
     float g = fbm(NZ_GRAIN, x, y);
-    float k = (0.94f + 0.12f * g) * (0.985f + 0.03f * fbm(NZ_FLOOR, x, y));
-    float r = (158 + sv * 14 - 7) * k, gr = (145 + sv * 12 - 6) * k, b = (126 + sv * 10 - 5) * k;
-    float my = y - row * SLAB_H, mx = (x + off) - col * SLAB_W;
-    if (my < 2.0f || mx < 2.0f) { r = 132; gr = 120; b = 105; }    /* joints */
-    else if (my < 3.0f) { r *= 1.05f; gr *= 1.05f; b *= 1.05f; }   /* arête éclairée */
+    float blot = fbm(NZ_FLOOR, x * 0.25f, y * 0.25f);   /* grandes taches irrégulières */
+    float k = (0.95f + 0.08f * g) * (0.93f + 0.1f * blot);
+    bool right_page = x >= BINDING_X;
+    /* Côté chair (page de gauche) un peu plus blanc, côté poil (droite) un peu plus jaune. */
+    float r = (right_page ? 216 : 220) * k, gr = (right_page ? 196 : 202) * k, b = (right_page ? 152 : 164) * k;
+    b -= 10.0f * (1.0f - blot);                          /* les taches tirent vers le jaune */
+    if (hash01((int)floorf(x / 3.0f), (int)floorf(y / 3.0f), 91) < 0.010f) { r *= 0.86f; gr *= 0.84f; b *= 0.8f; }   /* follicule */
+
+    /* Réglure : sillon fin sous chaque ligne de texte, et deux lignes verticales qui encadrent la colonne. */
+    float x0 = right_page ? BINDING_X + MARGIN_IN : MARGIN_OUT, x1 = right_page ? PAGE_W - MARGIN_OUT : BINDING_X - MARGIN_IN;
+    float first = LINE0 + PITCH, last = LINE0 + (float)(LINES - 2) * PITCH;
+    float ly = fmodf(y - LINE0 + PITCH * 4.0f, PITCH);
+    if (x > x0 - 10.0f && x < x1 + 10.0f && y > first - 2.0f && y < last + 2.0f) {
+        if (ly >= 3.0f && ly < 4.0f) { r *= 0.93f; gr *= 0.92f; b *= 0.9f; }          /* sillon */
+        else if (ly >= 4.0f && ly < 5.0f) { r *= 1.03f; gr *= 1.03f; b *= 1.03f; }   /* son bord éclairé */
+    }
+    for (int v = 0; v < 2; v++) {
+        float vx = v == 0 ? x0 - 8.0f : x1 + 8.0f;
+        if (fabsf(x - vx) < 0.5f && y > first - 50.0f && y < last + 12.0f) { r *= 0.92f; gr *= 0.91f; b *= 0.89f; }
+    }
+    /* Piqûres dans la marge extérieure, une par ligne : elles guidaient la réglure. */
+    float prick_x = right_page ? PAGE_W - 46.0f : 46.0f;
+    float dy = fmodf(y - LINE0 - 3.5f + PITCH * 4.0f, PITCH);
+    if (dy > PITCH * 0.5f) dy -= PITCH;
+    float pd = (x - prick_x) * (x - prick_x) + dy * dy;
+    if (y > first - 6.0f && y < last + 6.0f) {
+        if (pd < 1.2f) { r = 92; gr = 72; b = 54; }
+        else if (pd < 3.0f) { r *= 0.9f; gr *= 0.88f; b *= 0.86f; }
+    }
 
     float f = 1.0f;
-    if (!has_cell(rc, cx, cy - 1)) f -= SDL_max(26.0f - (y - (float)cy * CELL_H), 0.0f) * 0.012f;
-    if (!has_cell(rc, cx - 1, cy)) f -= SDL_max(14.0f - (x - (float)cx * CELL_W), 0.0f) * 0.012f;
-    if (!has_cell(rc, cx + 1, cy)) f -= SDL_max(14.0f - ((float)(cx + 1) * CELL_W - x), 0.0f) * 0.012f;
+    if (!has_cell(rc, cx, cy - 1)) f -= SDL_max(26.0f - (y - (float)cy * CELL_H), 0.0f) * 0.010f;
+    if (!has_cell(rc, cx - 1, cy)) f -= SDL_max(14.0f - (x - (float)cx * CELL_W), 0.0f) * 0.010f;
+    if (!has_cell(rc, cx + 1, cy)) f -= SDL_max(14.0f - ((float)(cx + 1) * CELL_W - x), 0.0f) * 0.010f;
     float nx = (x - (fb->x + fb->w * 0.5f)) / (fb->w * 0.5f + WALL_SIDE);
     float ny = (y - (fb->y + fb->h * 0.5f)) / (fb->h * 0.5f);
-    f -= 0.07f * (nx * nx + ny * ny);
+    f -= 0.05f * (nx * nx + ny * ny);
+    /* Bords de la double page, un peu plus sombres et plus roux (le doigt du lecteur, la poussière). */
+    float edge = SDL_min(SDL_min(x, PAGE_W - x), SDL_min(y, PAGE_H - y));
+    f -= 0.12f * expf(-edge / 70.0f);
     float d = x - BINDING_X;   /* creux de la reliure */
-    if (fabsf(d) < 300.0f) f -= 0.34f * expf(-(d / 16.0f) * (d / 16.0f)) + 0.12f * expf(-(d / 90.0f) * (d / 90.0f));
+    if (fabsf(d) < 300.0f) f -= 0.30f * expf(-(d / 16.0f) * (d / 16.0f)) + 0.12f * expf(-(d / 90.0f) * (d / 90.0f));
     put_rgb(o, r * f, gr * f, b * f, 255);
 }
 
@@ -783,7 +912,7 @@ static void floor_color(const RoomCells *rc, const SDL_FRect *fb, float x, float
  * Construction d'une salle, découpée en tranches (quelques lignes de pixels à la fois)
  * pour pouvoir dessiner les salles voisines à l'avance sans faire sauter d'image.
  */
-typedef enum BuildPhase { PH_SHADE, PH_OUTLINE, PH_INK, PH_BLEND, PH_FINISH } BuildPhase;
+typedef enum BuildPhase { PH_SHADE, PH_OUTLINE, PH_INK, PH_MARGINALIA, PH_BLEND, PH_DETAILS, PH_FINISH } BuildPhase;
 #define INK_CHUNK 512   /* éléments de la page examinés par tranche */
 
 typedef struct BuildJob {
@@ -879,7 +1008,7 @@ static void shade_row(BuildJob *j, int py)
                     break;
                 }
             }
-            brick_color(w, x, y, t, along, o);
+            wall_color(w, x, y, t, along, o);
             break;
         }
     }
@@ -948,6 +1077,433 @@ static void draw_stitches(BuildJob *j)
     }
 }
 
+/* ------------------------------------------------------------ trous du parchemin (GDD §21) */
+#define HOLE_MARGIN  12      /* place autour d'un trou pour son ombre ou sa brûlure, px */
+#define HOLE_CHUNK_W 256     /* un grand trou est découpé en morceaux de cette taille */
+#define HOLE_CHUNK_H 200
+static Uint8 hole_px[HOLE_CHUNK_W * HOLE_CHUNK_H * 4];
+
+/* Distance signée d'un point à un rectangle aux coins arrondis (négative dedans). */
+static float sd_round_box(float px, float py, float x0, float y0, float x1, float y1, float r)
+{
+    float hx = (x1 - x0) * 0.5f - r, hy = (y1 - y0) * 0.5f - r;
+    float qx = fabsf(px - (x0 + x1) * 0.5f) - hx, qy = fabsf(py - (y0 + y1) * 0.5f) - hy;
+    float ox = SDL_max(qx, 0.0f), oy = SDL_max(qy, 0.0f);
+    return sqrtf(ox * ox + oy * oy) + SDL_min(SDL_max(qx, qy), 0.0f) - r;
+}
+
+static bool tile_is(const RoomLayout *L, int tx, int ty, int kind)
+{
+    return tx >= 0 && ty >= 0 && tx < L->w && ty < L->h && L->tiles[ty][tx] == kind;
+}
+
+/* Distance signée au trou de genre `kind` près du point (coordonnées page) : union des cases,
+ * en retrait sur les bords libres, collées aux cases voisines du même genre. */
+static float hole_sd(const RoomLayout *L, int kind, float x, float y, int solo_x, int solo_y)
+{
+    float ox = (float)L->cx0 * CELL_TILES_X * TILE_W, oy = (float)L->cy0 * CELL_TILES_Y * TILE_H;
+    int tx = (int)floorf((x - ox) / TILE_W), ty = (int)floorf((y - oy) / TILE_H);
+    float best = 1e9f;
+    for (int ny = ty - 1; ny <= ty + 1; ny++) {
+        for (int nx = tx - 1; nx <= tx + 1; nx++) {
+            if (!tile_is(L, nx, ny, kind) || (solo_x >= 0 && (nx != solo_x || ny != solo_y))) continue;
+            SDL_FRect t = layout_tile_rect(L, nx, ny);
+            float d;
+            if (kind == TILE_WORM) {
+                float ex = (x - (t.x + t.w * 0.5f)) / 17.0f, ey = (y - (t.y + t.h * 0.5f)) / 14.0f;
+                d = (sqrtf(ex * ex + ey * ey) - 1.0f) * 14.0f;
+            } else {
+                bool l = tile_is(L, nx - 1, ny, kind), r = tile_is(L, nx + 1, ny, kind);
+                bool u = tile_is(L, nx, ny - 1, kind), dn = tile_is(L, nx, ny + 1, kind);
+                float ix = 5.0f, iy = 5.0f, rad = 9.0f;
+                if (kind == TILE_SEWN) {
+                    bool vert = u || dn;   /* fente dans le sens des cases voisines */
+                    ix = vert ? 17.0f : 5.0f;
+                    iy = vert ? 4.0f : 14.0f;
+                    rad = 5.0f;
+                }
+                d = sd_round_box(x, y, t.x + (l ? -rad - 2.0f : ix), t.y + (u ? -rad - 2.0f : iy),
+                                 t.x + t.w - (r ? -rad - 2.0f : ix), t.y + t.h - (dn ? -rad - 2.0f : iy), rad);
+            }
+            best = SDL_min(best, d);
+        }
+    }
+    return best;
+}
+
+static void put_rgba(Uint8 *o, float r, float g, float b, float a)
+{
+    put_rgb(o, r, g, b, (Uint8)SDL_clamp(a * 255.0f, 0.0f, 255.0f));
+}
+
+/* Un pixel d'un trou : fond noir, tranche du parchemin au bord du fond, bord déchiré, ombre ou brûlure. */
+static void hole_pixel(const RoomLayout *L, int kind, float x, float y, int solo_x, int solo_y, Uint8 *o)
+{
+    float amp = kind == TILE_HOLE ? 7.0f : kind == TILE_BURN ? 4.0f : kind == TILE_WORM ? 3.0f : 2.0f;
+    float n = (fbm(NZ_WEAR, x * 3.1f, y * 3.1f) - 0.5f) * amp + (hash01((int)x, (int)y, 61) - 0.5f) * amp * 0.35f;
+    /* Ondulation large : le papier se déchire en festons irréguliers. */
+    float wave = kind == TILE_HOLE ? 12.0f : kind == TILE_BURN ? 8.0f : 0.0f;
+    n += (fbm(NZ_WEAR, x * 0.8f + 157.0f, y * 0.8f + 91.0f) - 0.5f) * wave;
+    float d = hole_sd(L, kind, x, y, solo_x, solo_y) + n;
+    put_rgba(o, 0, 0, 0, 0.0f);
+    if (d < 0.0f) {
+        /* Dedans : le noir, avec la tranche du parchemin vue en haut (fausse perspective). */
+        float up = hole_sd(L, kind, x, y - 4.0f, solo_x, solo_y) + n;
+        if (up >= 0.0f) put_rgba(o, 132, 108, 80, 1.0f);
+        else put_rgba(o, 22, 16, 15, 1.0f);
+        return;
+    }
+    switch (kind) {
+    case TILE_BURN:
+        if (d < 2.5f) put_rgba(o, 38, 22, 14, 1.0f);                                   /* bord carbonisé */
+        else if (d < 12.0f) {
+            float a = 1.0f - (d - 2.5f) / 9.5f;
+            put_rgba(o, 112, 64, 30, 0.85f * a * a);                                   /* roussi */
+        }
+        if (d < 3.0f && hash01((int)x, (int)y, 62) < 0.07f) put_rgba(o, 214, 108, 40, 1.0f);   /* braises */
+        break;
+    case TILE_WORM:
+        if (d < 2.0f) put_rgba(o, 124, 100, 72, 1.0f);                                 /* bord grignoté */
+        else if (d < 10.0f && hash01((int)floorf(x / 2.0f), (int)floorf(y / 2.0f), 63) < 0.05f) put_rgba(o, 96, 74, 52, 0.9f);   /* sciure */
+        else if (d < 4.0f) put_rgba(o, 40, 26, 20, 0.35f * (1.0f - (d - 2.0f) / 2.0f));
+        break;
+    default:
+        if (d < 2.0f) put_rgba(o, 244, 234, 208, 1.0f);                                /* fibres du bord déchiré */
+        else if (d < 6.0f) put_rgba(o, 40, 26, 20, 0.30f * (1.0f - (d - 2.0f) / 4.0f)); /* ombre : le bord se soulève */
+        break;
+    }
+}
+
+/* Trou recousu : points de couture par-dessus la fente. */
+static void stitch_pixel(const RoomLayout *L, float x, float y, Uint8 *o)
+{
+    float ox = (float)L->cx0 * CELL_TILES_X * TILE_W, oy = (float)L->cy0 * CELL_TILES_Y * TILE_H;
+    int tx = (int)floorf((x - ox) / TILE_W), ty = (int)floorf((y - oy) / TILE_H);
+    if (!tile_is(L, tx, ty, TILE_SEWN)) return;
+    bool vert = tile_is(L, tx, ty - 1, TILE_SEWN) || tile_is(L, tx, ty + 1, TILE_SEWN);
+    float d = hole_sd(L, TILE_SEWN, x, y, -1, -1);
+    float along = vert ? y : x;
+    float ph = fmodf(along, 8.0f);
+    if (d < 4.5f && ph < 2.0f) {
+        if (d > 3.0f) put_rgba(o, 70, 50, 40, 1.0f);                                   /* trou de l'aiguille */
+        else put_rgba(o, ph < 1.0f ? 230 : 176, ph < 1.0f ? 214 : 156, ph < 1.0f ? 174 : 116, 1.0f);   /* fil */
+    }
+}
+
+static bool point_on_floor(const Room *room, float x, float y)
+{
+    SDL_FPoint p = { x, y };
+    for (int i = 0; i < room->cell_count; i++) {
+        if (SDL_PointInRectFloat(&p, &room->cells[i])) return true;
+    }
+    return false;
+}
+
+/* Textures d'un trou dont les cases vont de (x0, y0) à (x1, y1) (découpé en morceaux s'il est grand).
+ * solo_x >= 0 : seulement cette case (trou de ver, toujours seul). */
+static void build_hole(RoomTex *rt, const Room *room, SDL_Renderer *rend, int kind,
+                       int x0, int y0, int x1, int y1, int solo_x, int solo_y)
+{
+    const RoomLayout *L = room->layout;
+    SDL_FRect a = layout_tile_rect(L, x0, y0), b = layout_tile_rect(L, x1, y1);
+    int bx0 = (int)a.x - HOLE_MARGIN, by0 = (int)a.y - HOLE_MARGIN;
+    int bx1 = (int)(b.x + b.w) + HOLE_MARGIN, by1 = (int)(b.y + b.h) + HOLE_MARGIN;
+    for (int cy = by0; cy < by1; cy += HOLE_CHUNK_H) {
+        for (int cx = bx0; cx < bx1; cx += HOLE_CHUNK_W) {
+            int w = SDL_min(HOLE_CHUNK_W, bx1 - cx), h = SDL_min(HOLE_CHUNK_H, by1 - cy);
+            bool any = false;
+            for (int py = 0; py < h; py++) {
+                for (int px = 0; px < w; px++) {
+                    Uint8 *o = &hole_px[(py * w + px) * 4];
+                    float x = (float)(cx + px) + 0.5f, y = (float)(cy + py) + 0.5f;
+                    put_rgba(o, 0, 0, 0, 0.0f);
+                    if (!point_on_floor(room, x, y)) continue;
+                    hole_pixel(L, kind, x, y, solo_x, solo_y, o);
+                    if (kind == TILE_SEWN) stitch_pixel(L, x, y, o);
+                    any |= o[3] != 0;
+                }
+            }
+            if (!any || rt->hole_count >= MAX_HOLE_TEX) continue;
+            rt->hole_tex[rt->hole_count] = upload(rend, hole_px, w, h, true);
+            rt->hole_rect[rt->hole_count++] = (SDL_FRect){ (float)cx, (float)cy, (float)w, (float)h };
+        }
+    }
+}
+
+/* Textures des trous de la salle : une par groupe de cases du même genre, une par trou de ver.
+ * Déjà construites : on ajoute seulement les nouveaux trous de ver (les autres ne changent pas en jeu). */
+static void build_holes(RoomTex *rt, const Room *room, SDL_Renderer *rend)
+{
+    const RoomLayout *L = room->layout;
+    bool full = !rt->holes_built;
+    if (full) free_holes(rt);
+    rt->holes_built = true;
+    if (!L) return;
+    rt->holes_version = L->version;
+    static Uint8 seen[LAYOUT_H][LAYOUT_W];
+    static int qx[LAYOUT_W * LAYOUT_H], qy[LAYOUT_W * LAYOUT_H];
+    SDL_memset(seen, 0, sizeof seen);
+    for (int sy = 0; sy < L->h; sy++) {
+        for (int sx = 0; sx < L->w; sx++) {
+            int kind = L->tiles[sy][sx];
+            if (kind == TILE_WORM) {
+                if (rt->worm_drawn[sy][sx]) continue;
+                rt->worm_drawn[sy][sx] = 1;
+                build_hole(rt, room, rend, kind, sx, sy, sx, sy, sx, sy);
+                continue;
+            }
+            if (!full || !tile_is_hole(kind) || seen[sy][sx]) continue;
+            /* Groupe de cases du même genre (voisines, diagonales comprises). */
+            int head = 0, tail = 0, x0 = sx, y0 = sy, x1 = sx, y1 = sy;
+            qx[tail] = sx; qy[tail++] = sy; seen[sy][sx] = 1;
+            while (head < tail) {
+                int cx = qx[head], cy = qy[head++];
+                x0 = SDL_min(x0, cx); y0 = SDL_min(y0, cy); x1 = SDL_max(x1, cx); y1 = SDL_max(y1, cy);
+                for (int dy = -1; dy <= 1; dy++) {
+                    for (int dx = -1; dx <= 1; dx++) {
+                        int nx = cx + dx, ny = cy + dy;
+                        if (tile_is(L, nx, ny, kind) && !seen[ny][nx]) {
+                            seen[ny][nx] = 1;
+                            qx[tail] = nx; qy[tail++] = ny;
+                        }
+                    }
+                }
+            }
+            build_hole(rt, room, rend, kind, x0, y0, x1, y1, -1, -1);
+        }
+    }
+}
+
+/* ------------------------------------------------------------ petites choses sur la page (GDD §21) */
+
+static void blend_px(BuildJob *j, float x, float y, float r, float g, float b, float a)
+{
+    int px = (int)floorf(x - j->ox), py = (int)floorf(y - j->oy);
+    if (px < 0 || py < 0 || px >= j->W || py >= j->H || a <= 0.0f) return;
+    int i = py * j->W + px;
+    if (labels[i] != L_FLOOR) return;
+    Uint8 *o = &pixels[i * 4];
+    a = SDL_min(a, 1.0f);
+    o[0] = (Uint8)((float)o[0] * (1.0f - a) + r * a);
+    o[1] = (Uint8)((float)o[1] * (1.0f - a) + g * a);
+    o[2] = (Uint8)((float)o[2] * (1.0f - a) + b * a);
+}
+
+static void blend_disc(BuildJob *j, float cx, float cy, float rx, float ry, float r, float g, float b, float a)
+{
+    for (float y = floorf(cy - ry); y <= cy + ry; y += 1.0f) {
+        for (float x = floorf(cx - rx); x <= cx + rx; x += 1.0f) {
+            float ex = (x + 0.5f - cx) / rx, ey = (y + 0.5f - cy) / ry;
+            if (ex * ex + ey * ey <= 1.0f) blend_px(j, x, y, r, g, b, a);
+        }
+    }
+}
+
+/* Sceau de cire écrasé sur la page, avec ses deux queues de parchemin : une goutte aux bords
+ * irréguliers, un bourrelet en relief éclairé d'en haut à gauche, et l'empreinte de la matrice
+ * (grènetis et croix pattée) au milieu. Plat : purement décoratif. */
+/* Relief du sceau (px, coordonnées relatives au centre) : bourrelet au bord, champ creux,
+ * grènetis de 12 perles et croix pattée en relief. Renvoie la hauteur, ou -1 hors de la cire. */
+static float seal_height(float px, float py, float R, float ph)
+{
+    float a = atan2f(py, px);
+    float edge = R * (1.0f + 0.07f * sinf(a * 3.0f + ph) + 0.05f * sinf(a * 7.0f + ph * 2.0f));
+    float r = sqrtf(px * px + py * py), t = r / edge;
+    if (t > 1.0f) return -1.0f;
+    if (t > 0.70f) return 3.0f * sinf(SDL_PI_F * (t - 0.70f) / 0.30f);
+    float u = px / (edge * 0.70f), v = py / (edge * 0.70f), h = 0.0f;
+    /* Perles. */
+    float ru = sqrtf(u * u + v * v), au = atan2f(v, u) + 7.0f * SDL_PI_F;
+    float k = SDL_fmodf(au, SDL_PI_F / 6.0f) - SDL_PI_F / 12.0f;
+    float bx = ru * sinf(k), by = ru * cosf(k) - 0.80f, bd = sqrtf(bx * bx + by * by) / 0.10f;
+    if (bd < 1.0f) h = SDL_max(h, 1.6f * (1.0f - bd * bd));
+    /* Croix pattée : distance douce à la forme. */
+    float ax = fabsf(u), ay = fabsf(v), m = SDL_max(ax, ay), n = SDL_min(ax, ay);
+    float arm = 0.12f + 0.20f * m / 0.60f;
+    float sd = SDL_max(m - 0.60f, n - arm);
+    if (sd < 0.08f) h = SDL_max(h, 2.0f * SDL_clamp((0.08f - sd) / 0.16f, 0.0f, 1.0f));
+    return h;
+}
+
+static void draw_seal(BuildJob *j, float x, float y, Uint32 seed)
+{
+    static const float WAX[3][3] = { { 170, 30, 28 }, { 64, 104, 54 }, { 132, 86, 46 } };   /* rouge, vert, cire brune */
+    int c = (seed >> 3) % 10 < 6 ? 0 : (seed >> 3) % 10 < 8 ? 1 : 2;
+    float R = 15.0f + (float)((seed >> 7) % 3);
+    float ph = (float)(seed % 628) / 100.0f;
+    /* Queues de parchemin qui sortent dessous, un peu écartées. */
+    for (int q = 0; q < 2; q++) {
+        float dir = q ? 0.35f : -0.25f, len = R + 12.0f + (float)((seed >> (12 + q)) & 7);
+        for (float t = 0.0f; t < len; t += 0.5f) {
+            float cx = x + sinf(dir) * t + (q ? 3.0f : -3.0f), cy = y + cosf(dir) * t;
+            bool notch = t > len - 4.0f;
+            for (float w = -2.5f; w <= 2.5f; w += 1.0f) {
+                if (notch && fabsf(w) < (t - (len - 4.0f)) * 0.7f) continue;   /* bout en queue d'aronde */
+                float shade = w < -1.5f ? 0.82f : 1.0f;
+                blend_px(j, cx + w, cy, 224 * shade, 210 * shade, 172 * shade, 1.0f);
+            }
+            blend_px(j, cx + 3.5f, cy + 1.0f, 60, 40, 30, 0.25f);
+        }
+    }
+    for (float py = -R - 4.0f; py <= R + 4.0f; py += 1.0f) {
+        for (float px = -R - 4.0f; px <= R + 4.0f; px += 1.0f) {
+            float cx = px + 0.5f, cy = py + 0.5f;
+            float h = seal_height(cx, cy, R, ph);
+            if (h < 0.0f) {
+                if (seal_height(cx - 1.5f, cy - 2.0f, R, ph) >= 0.0f) blend_px(j, x + px, y + py, 50, 30, 24, 0.35f);   /* ombre portée */
+                continue;
+            }
+            /* Lumière d'en haut à gauche : pente de la hauteur. */
+            float hx = SDL_max(seal_height(cx + 0.7f, cy, R, ph), 0.0f) - SDL_max(seal_height(cx - 0.7f, cy, R, ph), 0.0f);
+            float hy = SDL_max(seal_height(cx, cy + 0.7f, R, ph), 0.0f) - SDL_max(seal_height(cx, cy - 0.7f, R, ph), 0.0f);
+            float lit = SDL_clamp((hx * 0.6f + hy * 0.8f) * 0.32f, -0.55f, 0.55f) - 0.08f + h * 0.07f;
+            float k = 1.0f + lit;
+            float rr = WAX[c][0] * k, gg = WAX[c][1] * k, bb = WAX[c][2] * k;
+            if (lit > 0.38f) { rr += 46; gg += 38; bb += 32; }       /* reflet */
+            blend_px(j, x + px, y + py, SDL_min(rr, 255.0f), SDL_min(gg, 255.0f), SDL_min(bb, 255.0f), 1.0f);
+        }
+    }
+}
+
+typedef enum Detail { DET_FLY, DET_FLOWER, DET_HAIR, DET_WINE, DET_FINGER, DET_COUNT } Detail;
+
+static void draw_detail(BuildJob *j, Detail kind, float x, float y, Uint32 seed)
+{
+    float ph = (float)(seed & 255) / 40.0f;
+    switch (kind) {
+    case DET_FLY:   /* mouche écrasée entre les pages */
+        blend_disc(j, x + 3.0f, y + 1.0f, 5.0f, 1.6f, 92, 34, 28, 0.35f);
+        blend_disc(j, x - 3.0f, y - 2.0f, 3.2f, 2.0f, 130, 130, 140, 0.35f);
+        blend_disc(j, x + 3.0f, y - 2.0f, 3.2f, 2.0f, 130, 130, 140, 0.35f);
+        blend_disc(j, x, y, 2.5f, 2.0f, 30, 24, 20, 0.9f);
+        for (int k = 0; k < 6; k++) blend_px(j, x - 3.0f + (float)(k % 3) * 3.0f, y + ((k < 3) ? -3.0f : 3.0f), 30, 24, 20, 0.7f);
+        break;
+    case DET_FLOWER: {   /* fleur séchée, pressée et fanée */
+        for (int k = 0; k < 24; k++) {
+            float t = (float)k / 23.0f;
+            blend_px(j, x + t * 6.0f + sinf(t * 3.0f + ph) * 2.0f, y + t * 22.0f, 104, 112, 64, 0.7f);
+        }
+        blend_disc(j, x + 5.0f, y + 12.0f, 4.0f, 1.8f, 96, 116, 62, 0.55f);
+        blend_disc(j, x - 1.0f, y + 16.0f, 4.0f, 1.8f, 96, 116, 62, 0.55f);
+        for (int k = 0; k < 5; k++) {
+            float a = (float)k * 1.2566f + ph;
+            blend_disc(j, x + cosf(a) * 4.0f, y + sinf(a) * 3.4f, 3.2f, 2.6f, 148, 104, 150, 0.55f);
+        }
+        blend_disc(j, x, y, 1.6f, 1.4f, 190, 160, 70, 0.75f);
+        break;
+    }
+    case DET_HAIR:   /* un cheveu */
+        for (int k = 0; k < 60; k++) {
+            float t = (float)k / 59.0f;
+            blend_px(j, x + t * 44.0f, y + sinf(t * 5.0f + ph) * 6.0f + t * 4.0f, 54, 40, 30, 0.5f);
+        }
+        break;
+    case DET_WINE: {   /* tache de vin en anneau */
+        float R = 12.0f + (float)(seed % 7);
+        for (float yy = -R; yy <= R; yy += 1.0f) {
+            for (float xx = -R; xx <= R; xx += 1.0f) {
+                float d = sqrtf(xx * xx + (yy / 0.8f) * (yy / 0.8f)) / R;
+                if (d >= 1.0f) continue;
+                float edge = SDL_clamp((d - 0.82f) / 0.18f, 0.0f, 1.0f);
+                blend_px(j, x + xx, y + yy, 126, 44, 56, 0.08f + 0.28f * edge * (1.0f - edge) * 4.0f);
+            }
+        }
+        break;
+    }
+    default:   /* empreinte de doigt à l'encre */
+        for (float yy = -10.0f; yy <= 10.0f; yy += 1.0f) {
+            for (float xx = -8.0f; xx <= 8.0f; xx += 1.0f) {
+                float e = sqrtf((xx / 7.0f) * (xx / 7.0f) + (yy / 9.0f) * (yy / 9.0f));
+                if (e < 1.0f && sinf(e * 19.0f + fbm(NZ_WEAR, x + xx, y + yy) * 3.0f) > 0.45f) {
+                    blend_px(j, x + xx, y + yy, 58, 40, 30, 0.3f * (1.0f - e * 0.6f));
+                }
+            }
+        }
+        break;
+    }
+}
+
+/* Une ou deux petites choses par cellule, au hasard (même graine = mêmes choses). */
+static void draw_details(BuildJob *j)
+{
+    for (int i = 0; i < j->rc.n; i++) {
+        int cx = j->rc.cx[i], cy = j->rc.cy[i];
+        Uint32 h = hash3(cx, cy, (int)(floor_hash & 0xffffff));
+        int n = (int)(h % 5) < 2 ? 1 : ((h % 5) == 2 ? 2 : 0);
+        for (int k = 0; k < n; k++) {
+            Uint32 hk = hash3(cx * 31 + k, cy * 17, (int)(floor_hash >> 4));
+            float x = (float)cx * CELL_W + 60.0f + (float)(hk % 640);
+            float y = (float)cy * CELL_H + 40.0f + (float)((hk >> 10) % 270);
+            draw_detail(j, (Detail)((hk >> 20) % DET_COUNT), x, y, hk);
+        }
+        /* Un sceau de temps en temps, collé là par un chancelier distrait. */
+        Uint32 hs = hash3(cx * 7 + 3, cy * 13 + 1, (int)(floor_hash >> 8));
+        if (hs % 100 < 40) {
+            float x = (float)cx * CELL_W + 70.0f + (float)(hs % 620);
+            float y = (float)cy * CELL_H + 50.0f + (float)((hs >> 12) % 240);
+            draw_seal(j, x, y, hs >> 4);
+        }
+    }
+}
+
+/* Marginalia dans les marges extérieures : un lapin armé ou un escargot chevalier, à la plume. */
+static void cov_ellipse(const Coverage *c, float cx, float cy, float rx, float ry, int n)
+{
+    for (int k = 0; k < n; k++) {
+        float a0 = (float)k / (float)n * 2.0f * SDL_PI_F, a1 = (float)(k + 1) / (float)n * 2.0f * SDL_PI_F;
+        cov_segment(c, cx + cosf(a0) * rx, cy + sinf(a0) * ry, cx + cosf(a1) * rx, cy + sinf(a1) * ry, 0.7f);
+    }
+}
+
+static void draw_rabbit(const Coverage *ink, const Coverage *red, float x, float y)
+{
+    cov_ellipse(ink, x, y - 12.0f, 12.0f, 9.0f, 18);                     /* corps */
+    cov_ellipse(ink, x + 13.0f, y - 23.0f, 6.0f, 5.0f, 12);              /* tête */
+    const float ears[2][4][2] = { { { 10, -27 }, { 8, -42 }, { 11, -44 }, { 13, -28 } },
+                                  { { 15, -27 }, { 17, -41 }, { 20, -41 }, { 18, -27 } } };
+    for (int e = 0; e < 2; e++) {
+        for (int k = 0; k < 3; k++) cov_segment(ink, x + ears[e][k][0], y + ears[e][k][1], x + ears[e][k + 1][0], y + ears[e][k + 1][1], 0.7f);
+    }
+    cov_ellipse(ink, x - 12.0f, y - 14.0f, 3.0f, 3.0f, 8);              /* queue */
+    cov_segment(ink, x - 6.0f, y - 4.0f, x - 9.0f, y, 0.7f);
+    cov_segment(ink, x + 6.0f, y - 4.0f, x + 9.0f, y, 0.7f);
+    cov_segment(ink, x + 17.0f, y - 17.0f, x + 32.0f, y - 36.0f, 0.8f);  /* épée */
+    cov_segment(red, x + 20.0f, y - 25.0f, x + 25.0f, y - 19.0f, 1.0f);  /* garde */
+    cov_segment(red, x + 15.0f, y - 24.0f, x + 15.0f, y - 24.0f, 1.2f);  /* œil rouge */
+}
+
+static void draw_snail_knight(const Coverage *ink, const Coverage *red, float x, float y)
+{
+    float py = y - 16.0f;
+    for (int k = 1; k < 40; k++) {                                       /* coquille en spirale */
+        float a0 = (float)(k - 1) * 0.45f, a1 = (float)k * 0.45f;
+        float r0 = 1.0f + (float)(k - 1) * 0.28f, r1 = 1.0f + (float)k * 0.28f;
+        cov_segment(ink, x + cosf(a0) * r0, py + sinf(a0) * r0, x + cosf(a1) * r1, py + sinf(a1) * r1, 0.7f);
+    }
+    cov_segment(ink, x - 16.0f, y, x + 18.0f, y, 0.7f);                  /* pied */
+    cov_segment(ink, x + 18.0f, y, x + 22.0f, y - 12.0f, 0.7f);          /* tête */
+    cov_segment(ink, x + 22.0f, y - 12.0f, x + 20.0f, y - 20.0f, 0.6f);  /* cornes */
+    cov_segment(ink, x + 22.0f, y - 12.0f, x + 26.0f, y - 19.0f, 0.6f);
+    cov_segment(ink, x + 22.0f, y - 8.0f, x + 46.0f, y - 22.0f, 0.8f);   /* lance */
+    cov_segment(red, x + 38.0f, y - 18.0f, x + 46.0f, y - 25.0f, 1.0f);  /* fanion */
+    cov_segment(red, x + 38.0f, y - 18.0f, x + 40.0f, y - 26.0f, 1.0f);
+}
+
+static void draw_marginalia(BuildJob *j)
+{
+    Coverage ink = { ink_buf, j->W, j->H, j->ox, j->oy }, red = { red_buf, j->W, j->H, j->ox, j->oy };
+    for (int i = 0; i < j->rc.n; i++) {
+        int cx = j->rc.cx[i], cy = j->rc.cy[i];
+        if (cx != 0 && cx != FLOOR_COLS - 1) continue;
+        Uint32 h = hash3(cx, cy, (int)(floor_hash & 0xffff) + 5);
+        if (h % 3 == 0) continue;
+        float x = cx == 0 ? 52.0f : PAGE_W - 98.0f;
+        float y = (float)cy * CELL_H + 90.0f + (float)((h >> 8) % 200);
+        if ((h >> 4) & 1) draw_rabbit(&ink, &red, x, y);
+        else draw_snail_knight(&ink, &red, x, y);
+    }
+}
+
 /* 5) Texture de la salle, et le bois de chaque porte dans une petite texture posée par-dessus. */
 static void job_finish(BuildJob *j, SDL_Renderer *rend)
 {
@@ -1006,18 +1562,26 @@ static bool job_run(SDL_Renderer *rend, Uint64 deadline)
             break;
         case PH_OUTLINE:
             outline_row(j, j->cursor++);
-            if (j->cursor >= j->H) { j->phase = op_count > 0 ? PH_INK : PH_FINISH; j->cursor = 0; }
+            if (j->cursor >= j->H) { j->phase = op_count > 0 ? PH_INK : PH_MARGINALIA; j->cursor = 0; }
             break;
         case PH_INK: {
             Coverage ink = { ink_buf, j->W, j->H, j->ox, j->oy }, red = { red_buf, j->W, j->H, j->ox, j->oy };
             draw_page_ink(&ink, &red, j->cursor, j->cursor + INK_CHUNK);
             j->cursor += INK_CHUNK;
-            if (j->cursor >= op_count) { j->phase = PH_BLEND; j->cursor = 0; }
+            if (j->cursor >= op_count) { j->phase = PH_MARGINALIA; j->cursor = 0; }
             break;
         }
+        case PH_MARGINALIA:
+            draw_marginalia(j);
+            j->phase = PH_BLEND;
+            break;
+        case PH_DETAILS:
+            draw_details(j);
+            j->phase = PH_FINISH;
+            break;
         case PH_BLEND:
             blend_row(j, j->cursor++);
-            if (j->cursor >= j->H) { j->phase = PH_FINISH; j->cursor = 0; }
+            if (j->cursor >= j->H) { j->phase = PH_DETAILS; j->cursor = 0; }
             break;
         default:
             job_finish(j, rend);
@@ -1056,13 +1620,25 @@ void decor_quit(void)
     font_quit();
 }
 
-void decor_set_floor(Uint64 seed)
+void decor_set_floor(const Floor *floor)
 {
     static bool   has_floor;
     static Uint64 current;
+    Uint64 seed = floor->seed;
     if (has_floor && seed == current) return;   /* même graine = même étage */
     has_floor = true;
     current = seed;
+    /* Trous du plan, en coordonnées de la double page : le texte les contournera. */
+    SDL_memset(page_holes, 0, sizeof page_holes);
+    for (int i = 0; i < floor->room_count; i++) {
+        const RoomLayout *L = &floor->rooms[i].layout;
+        for (int ty = 0; ty < L->h; ty++) {
+            for (int tx = 0; tx < L->w; tx++) {
+                int px = L->cx0 * CELL_TILES_X + tx, py = L->cy0 * CELL_TILES_Y + ty;
+                if (tile_is_hole(L->tiles[ty][tx]) && px < PAGE_TX && py < PAGE_TY) page_holes[py][px] = 1;
+            }
+        }
+    }
     free_all();
     generation++;
     Uint64 s = seed;
@@ -1096,6 +1672,16 @@ void decor_render_room(const Room *room, SDL_Renderer *r, Camera cam)
     if (!rt->tex) return;
     SDL_FRect dst = { floorf(room->bounds.x - cam.x), floorf(room->bounds.y - cam.y), (float)rt->w, (float)rt->h };
     SDL_RenderTexture(r, rt->tex, NULL, &dst);
+    /* Trous du parchemin : redessinés quand un ver en a percé un nouveau. */
+    if (!rt->holes_built || (room->layout && rt->holes_version != room->layout->version)) {
+        build_holes(&cache[room->index], room, r);
+    }
+    for (int i = 0; i < rt->hole_count; i++) {
+        SDL_FRect hr = rt->hole_rect[i];
+        hr.x = floorf(hr.x - cam.x);
+        hr.y = floorf(hr.y - cam.y);
+        SDL_RenderTexture(r, rt->hole_tex[i], NULL, &hr);
+    }
     if (room->doors_open) return;
     for (int d = 0; d < rt->door_count; d++) {
         if (!rt->door_tex[d]) continue;

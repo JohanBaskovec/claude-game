@@ -283,6 +283,25 @@ typedef struct Tuning {
     float sfx_volume;                 /* tous les bruitages, 0..1 */
     float sound_gain[SOUND_COUNT];    /* volume de chaque bruitage, 0..1 (peut dépasser 1) */
     float splat_boss_pitch;           /* mort du boss : même son, plus grave et plus long */
+    /* Salles : trous et obstacles (GDD §21) */
+    int   layout_features_min;        /* éléments (trous, groupes d'obstacles) par cellule */
+    int   layout_features_max;
+    float layout_symmetry;            /* chance qu'une salle soit symétrique */
+    float dark_room_chance;           /* chance qu'une salle normale soit sombre (à partir de 2 salles du départ) */
+    float inkwell_hp;                 /* dégâts de tirs pour casser un encrier */
+    float inkwell_coin_chance;        /* un encrier cassé donne des royalties */
+    int   candle_damage;              /* chandelle allumée touchée */
+    float needle_cycle;               /* aiguilles : durée d'un cycle, s */
+    float needle_out;                 /* ... dont sorties, s */
+    float needle_warn;                /* ... annoncées (pointes visibles) avant de sortir, s */
+    int   needle_damage;
+    float wax_radius;                 /* flaque de cire d'une chandelle éteinte, px */
+    float wax_slide_time;             /* sur la cire, Amadeus glisse : temps pour changer de vitesse, s */
+    float darkness;                   /* opacité du noir des salles sombres, 0..1 */
+    float light_player;               /* rayons de lumière, px */
+    float light_candle;
+    float light_note;
+
     float baby_cry_min;               /* un bébé pleure toutes les baby_cry_min à baby_cry_max s */
     float baby_cry_max;
     float baby_cry_gap;               /* s au moins entre deux pleurs dans la salle, quel que soit le nombre de bébés */

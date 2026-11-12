@@ -51,6 +51,7 @@ typedef struct Enemy {
     float     sing_timer;     /* > 0 : bouche ouverte (moine), cloche qui sonne (sonneur) */
     bool      fire;           /* vrai pendant le pas où il tire, lu par game.c */
     bool      dig;            /* ver : vrai pendant le pas où il commence à creuser vers la surface */
+    bool      surfaced;       /* ver : vrai pendant le pas où il perce la surface (trou dans le parchemin) */
     float     cry_timer;      /* bébés : s avant de pleurer */
     bool      cry;            /* bébés : vrai pendant le pas où il se met à pleurer, lu par game.c */
 
@@ -71,6 +72,9 @@ void enemy_pool_clear(EnemyPool *pool);
 
 /* Fait apparaître un ennemi centré en (x, y). Renvoie NULL si le pool est plein. */
 Enemy *enemy_spawn(EnemyPool *pool, EnemyType type, float x, float y);
+
+/* Cases où se tient un ver sorti ou sur le point de sortir (sauf `except`) : ses trous à venir. */
+void enemy_worm_tiles(const EnemyPool *pool, const RoomLayout *L, const Enemy *except, TileMask out);
 
 /* Fait apparaître un ennemi à un endroit libre du sol, loin de (avoid_x, avoid_y). */
 Enemy *enemy_spawn_away_from(EnemyPool *pool, const Room *room, EnemyType type, float avoid_x, float avoid_y);

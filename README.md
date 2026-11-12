@@ -3,7 +3,7 @@
 Roguelike façon *The Binding of Isaac* à travers l'histoire de la musique. C11 + SDL3.
 Le design est dans [`docs/concept/GDD.md`](docs/concept/GDD.md).
 
-**État : Phase 11** — une vraie partie (étages, prix, métronomes-bombes, salle du trésor, Gros Bébé, trappe), les armes du Haut Moyen Âge (voix, olifant, flûte, lyre, tabourin, cloche, orgue) avec les premiers neumes, et les vrais graphismes du décor (château, portes, sol en manuscrit à neumes sur une double page avec sa reliure), d'Amadeus et du bébé médiéval, et les ennemis du premier étage : moine chanteur, plume géante qui crache de l'encre toxique, ver de livre qui surgit du sol, sonneur de cloche (sprites provisoires), qui explosent en laissant des taches de sang ou d'encre. Visée libre à la souris. Premier son : à chaque tir, Amadeus chante la syllabe suivante d'un chant grégorien (six chants, dont *Ut queant laxis* ; voix synthétisée par le jeu). Bruitages : ramassage d'un métronome ou de royalties, mort des ennemis, tic-tac et explosion du métronome, crachat d'encre des plumes, chant grave des moines, cloche des sonneurs, ver qui creuse, pleurs des bébés. Les autres graphismes sont encore provisoires.
+**État : Phase 12** — une vraie partie (étages, prix, métronomes-bombes, salle du trésor, Gros Bébé, trappe), les armes du Haut Moyen Âge (voix, olifant, flûte, lyre, tabourin, cloche, orgue) avec les premiers neumes, et les vrais graphismes du décor (murs peints façon tables des canons, portes en arcs peints, sol en parchemin couvert de neumes sur une double page avec sa reliure, mouches écrasées, fleurs séchées, sceaux de cire et *marginalia*), d'Amadeus et du bébé médiéval, et les ennemis du premier étage : moine chanteur, plume géante qui crache de l'encre toxique, ver de livre qui surgit du sol, sonneur de cloche (sprites provisoires), qui explosent en laissant des taches de sang ou d'encre. Visée libre à la souris. Premier son : à chaque tir, Amadeus chante la syllabe suivante d'un chant grégorien (six chants, dont *Ut queant laxis* ; voix synthétisée par le jeu). Bruitages : ramassage d'un métronome ou de royalties, mort des ennemis, tic-tac et explosion du métronome, crachat d'encre des plumes, chant grave des moines, cloche des sonneurs, ver qui creuse, pleurs des bébés. Salles plus vivantes : trous dans le parchemin (déchirés, brûlés, recousus, et ceux que les vers percent à chaque sortie), obstacles (piles de livres, encriers, chandelles, aiguilles du relieur, signets, fils de la reliure), salles sombres éclairées par Amadeus, les chandelles et les notes ; chaque porte reste toujours accessible depuis chaque porte. Les autres graphismes sont encore provisoires.
 
 ## Compiler et lancer
 
@@ -51,8 +51,9 @@ Les valeurs de départ et tous les autres paramètres sont dans [`src/config.c`]
 - **Décor** (`src/decor.c`) : calculé par le jeu, sans fichier image, d'après les prototypes de
   `docs/concept/outils_concept/`. Chaque salle est dessinée une fois dans une texture ; les salles
   voisines sont préparées à l'avance, quelques millisecondes par image.
-- **Personnages** (`src/sprite_data.h`) : des grilles de caractères, une lettre par couleur de la
-  palette. On les retouche dans un éditeur de texte.
+- **Personnages et obstacles** (`assets/sprites/`, table `SHEETS` de `src/sprite.c`) : des planches
+  PNG ; si un PNG manque, le jeu se rabat sur les grilles de caractères de `src/sprite_data.h`.
+  Les planches des ennemis de la phase 7 et des obstacles sont provisoires.
 
 ## Licences tierces
 

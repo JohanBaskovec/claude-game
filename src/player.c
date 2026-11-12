@@ -77,6 +77,7 @@ PlayerFire player_update(Player *p, const Input *in, float aim_x, float aim_y, c
     /* Déplacement avec accélération / freinage. */
     bool moving = mx != 0.0f || my != 0.0f;
     float tc = moving ? tuning.player_accel_time : tuning.player_decel_time;
+    if (p->slipping) tc = SDL_max(tc, tuning.wax_slide_time);   /* sur la cire, il glisse */
     p->vx = approach(p->vx, mx * p->stats.speed, tc, dt);
     p->vy = approach(p->vy, my * p->stats.speed, tc, dt);
     if (fabsf(p->vx) < 1.0f && mx == 0.0f) p->vx = 0.0f;

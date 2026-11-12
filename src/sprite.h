@@ -35,6 +35,9 @@ typedef enum SpriteId {
     SPR_WORM_HOLE_BUMP, SPR_WORM_HOLE_CRACK, SPR_WORM_HOLE,
     SPR_RINGER_0, SPR_RINGER_1, SPR_RINGER_RING,           /* marche 1, marche 2, bras levés */
     SPR_BELL, SPR_BELL_LEFT, SPR_BELL_RIGHT,
+    /* Obstacles de la phase 12 : planche PNG seulement. */
+    SPR_BOOKS_0, SPR_BOOKS_1, SPR_INKWELL, SPR_CANDLE_0, SPR_CANDLE_1,
+    SPR_NEEDLES_IN, SPR_NEEDLES_TIPS, SPR_NEEDLES_OUT,
     SPR_COUNT
 } SpriteId;
 

@@ -58,15 +58,36 @@ typedef struct Room {
     PropKind  prop_kind[ROOM_MAX_PROPS];
     bool      trapdoor;        /* trappe vers l'étage suivant (salle du boss vaincu) */
     float     trapdoor_x, trapdoor_y;
+    const RoomLayout *layout;  /* trous et obstacles : dans le plan de l'étage (le jeu les modifie là) */
+    Uint16    nav[LAYOUT_H][LAYOUT_W];   /* cases jusqu'au joueur (room_update_nav), NAV_FAR si inaccessible */
 } Room;
+
+#define NAV_FAR 0xFFFF
 
 void room_build(Room *room, const Floor *floor, int index);
 
 /* Vrai si le rectangle chevauche un mur, un meuble ou une porte fermée. */
 bool room_overlaps_wall(const Room *room, const SDL_FRect *r);
 
-/* Idem, en ignorant les meubles si props est faux (notes qui passent au-dessus). */
+/* Ce qui arrête un tir : les murs, et si `props` est vrai les meubles et les obstacles hauts
+ * (faux : notes qui passent au-dessus). Les trous et les obstacles bas n'arrêtent pas les tirs. */
 bool room_overlaps_solid(const Room *room, const SDL_FRect *r, bool props);
+
+/* Ce qui bloque la marche : murs, meubles, obstacles (sauf les aiguilles) et trous. */
+bool room_blocks_walk(const Room *room, const SDL_FRect *r);
+
+/* Point au hasard où une boîte de w x h peut se tenir (sol libre), à `margin` px des murs. */
+void room_random_free_point(const Room *room, float margin, float w, float h, float *x, float *y);
+
+/* Ramène (x, y) au centre de la case libre la plus proche si une boîte de w x h y serait bloquée. */
+void room_find_free_point(const Room *room, float w, float h, float *x, float *y);
+
+/* Distances (en cases) de chaque case jusqu'à celle du point (x, y), pour contourner les obstacles. */
+void room_update_nav(Room *room, float x, float y);
+
+/* Point vers lequel marcher pour aller de (x, y) à (tx, ty) : (tx, ty) si la ligne droite est libre,
+ * sinon le centre de la case suivante sur le plus court chemin (room_update_nav vers la cible). */
+void room_steer(const Room *room, float x, float y, float tx, float ty, float *sx, float *sy);
 
 /*
  * Déplace une boîte de (dx, dy) en la bloquant contre les murs.

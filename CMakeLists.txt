@@ -59,6 +59,8 @@ add_executable(fugue
     src/player.c
     src/projectile.c
     src/room.c
+    src/layout.c
+    src/obstacle.c
     src/splatter.c
     src/sprite.c
     src/text.c

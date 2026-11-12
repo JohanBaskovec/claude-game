@@ -30,6 +30,8 @@ typedef struct Projectile {
     float    length;          /* longueur du rayon, px */
     Uint32   hits;            /* ennemis déjà touchés (formes qui traversent), un bit par case du pool */
     bool     ink_drop;        /* vient de s'arrêter : game.c pose une flaque en (x, y) */
+    bool     stopped;         /* vient d'être arrêté par un mur ou un obstacle (game.c casse l'obstacle) */
+    Uint64   obstacle_hits;   /* obstacles déjà touchés (formes qui traversent), un bit par obstacle */
 } Projectile;
 
 typedef struct ProjectilePool {

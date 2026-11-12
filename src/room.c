@@ -3,6 +3,8 @@
 #include "decor.h"
 #include "draw.h"
 
+#include <math.h>
+
 /* Distance à laquelle le joueur arrive devant la porte, depuis le bord du sol. */
 #define ENTRY_INSET   40.0f
 /* Le centre du joueur doit dépasser le bord du sol d'autant pour passer la porte. */
@@ -88,6 +90,7 @@ void room_build(Room *room, const Floor *floor, int index)
     const FloorRoom *fr = &floor->rooms[index];
     *room = (Room){ 0 };
     room->index = index;
+    room->layout = &fr->layout;
     room->cell_count = fr->cell_count;
     room->doors_open = true;
 
@@ -181,6 +184,49 @@ bool room_overlaps_wall(const Room *room, const SDL_FRect *r)
     return room_overlaps_solid(room, r, true);
 }
 
+/* Cases de la grille que touche le rectangle. */
+static bool tile_span(const RoomLayout *L, const SDL_FRect *r, int *x0, int *y0, int *x1, int *y1)
+{
+    float ox = (float)L->cx0 * CELL_TILES_X * TILE_W, oy = (float)L->cy0 * CELL_TILES_Y * TILE_H;
+    *x0 = SDL_max((int)floorf((r->x - ox) / TILE_W), 0);
+    *y0 = SDL_max((int)floorf((r->y - oy) / TILE_H), 0);
+    *x1 = SDL_min((int)floorf((r->x + r->w - ox) / TILE_W), L->w - 1);
+    *y1 = SDL_min((int)floorf((r->y + r->h - oy) / TILE_H), L->h - 1);
+    return *x0 <= *x1 && *y0 <= *y1;
+}
+
+static bool overlaps_obstacle(const Room *room, const SDL_FRect *r, bool walk)
+{
+    const RoomLayout *L = room->layout;
+    for (int i = 0; L && i < L->obstacle_count; i++) {
+        const Obstacle *o = &L->obstacles[i];
+        if (!o->alive || !(walk ? obstacle_blocks_walk(o->type) : obstacle_blocks_shots(o->type))) continue;
+        SDL_FRect b = obstacle_rect(L, o);
+        if (overlaps(r, &b)) return true;
+    }
+    return false;
+}
+
+static bool overlaps_pit(const Room *room, const SDL_FRect *r)
+{
+    const RoomLayout *L = room->layout;
+    int x0, y0, x1, y1;
+    if (!L || !tile_span(L, r, &x0, &y0, &x1, &y1)) return false;
+    for (int y = y0; y <= y1; y++) {
+        for (int x = x0; x <= x1; x++) {
+            if (!tile_is_pit(L->tiles[y][x])) continue;
+            SDL_FRect b = pit_rect(L, x, y);
+            if (overlaps(r, &b)) return true;
+        }
+    }
+    return false;
+}
+
+bool room_blocks_walk(const Room *room, const SDL_FRect *r)
+{
+    return room_overlaps_solid(room, r, true) || overlaps_obstacle(room, r, true) || overlaps_pit(room, r);
+}
+
 bool room_overlaps_solid(const Room *room, const SDL_FRect *r, bool props)
 {
     for (int i = 0; i < room->wall_count; i++) {
@@ -189,6 +235,7 @@ bool room_overlaps_solid(const Room *room, const SDL_FRect *r, bool props)
     for (int i = 0; props && i < room->prop_count; i++) {
         if (overlaps(r, &room->props[i])) return true;
     }
+    if (props && overlaps_obstacle(room, r, false)) return true;
     if (!room->doors_open) {
         for (int i = 0; i < room->door_count; i++) {
             if (overlaps(r, &room->doors[i].opening)) return true;
@@ -217,6 +264,23 @@ static int collide_axis(const Room *room, SDL_FRect *box, float dx, float dy)
     }
     for (int i = 0; i < room->prop_count; i++) {
         blocked |= push_out(box, &room->props[i], dx, dy);
+    }
+    const RoomLayout *L = room->layout;
+    for (int i = 0; L && i < L->obstacle_count; i++) {
+        const Obstacle *o = &L->obstacles[i];
+        if (!o->alive || !obstacle_blocks_walk(o->type)) continue;
+        SDL_FRect b = obstacle_rect(L, o);
+        blocked |= push_out(box, &b, dx, dy);
+    }
+    int x0, y0, x1, y1;
+    if (L && tile_span(L, box, &x0, &y0, &x1, &y1)) {
+        for (int y = y0; y <= y1; y++) {
+            for (int x = x0; x <= x1; x++) {
+                if (!tile_is_pit(L->tiles[y][x])) continue;
+                SDL_FRect b = pit_rect(L, x, y);
+                blocked |= push_out(box, &b, dx, dy);
+            }
+        }
     }
     if (!room->doors_open) {
         for (int i = 0; i < room->door_count; i++) {
@@ -276,6 +340,116 @@ void room_random_floor_point(const Room *room, float margin, float *x, float *y)
     const SDL_FRect *c = &room->cells[SDL_rand(room->cell_count)];
     *x = c->x + margin + SDL_randf() * (c->w - 2.0f * margin);
     *y = c->y + margin + SDL_randf() * (c->h - 2.0f * margin);
+}
+
+void room_random_free_point(const Room *room, float margin, float w, float h, float *x, float *y)
+{
+    for (int attempt = 0; attempt < 64; attempt++) {
+        room_random_floor_point(room, margin, x, y);
+        SDL_FRect b = { *x - w * 0.5f, *y - h * 0.5f, w, h };
+        if (!room_blocks_walk(room, &b)) return;
+    }
+    room_find_free_point(room, w, h, x, y);
+}
+
+void room_find_free_point(const Room *room, float w, float h, float *x, float *y)
+{
+    SDL_FRect b = { *x - w * 0.5f, *y - h * 0.5f, w, h };
+    const RoomLayout *L = room->layout;
+    if (!L || !room_blocks_walk(room, &b)) return;
+    float best = 1e18f, bx = *x, by = *y;
+    for (int ty = 0; ty < L->h; ty++) {
+        for (int tx = 0; tx < L->w; tx++) {
+            if (!layout_walkable(L, tx, ty)) continue;
+            SDL_FRect t = layout_tile_rect(L, tx, ty);
+            float cx = t.x + t.w * 0.5f, cy = t.y + t.h * 0.5f;
+            SDL_FRect c = { cx - w * 0.5f, cy - h * 0.5f, w, h };
+            float d = (cx - *x) * (cx - *x) + (cy - *y) * (cy - *y);
+            if (d < best && !room_blocks_walk(room, &c)) {
+                best = d;
+                bx = cx;
+                by = cy;
+            }
+        }
+    }
+    *x = bx;
+    *y = by;
+}
+
+void room_update_nav(Room *room, float x, float y)
+{
+    static Uint16 queue[LAYOUT_W * LAYOUT_H];
+    const RoomLayout *L = room->layout;
+    for (int ty = 0; ty < LAYOUT_H; ty++) {
+        for (int tx = 0; tx < LAYOUT_W; tx++) room->nav[ty][tx] = NAV_FAR;
+    }
+    int sx, sy;
+    if (!L || !layout_tile_at(L, x, y, &sx, &sy)) return;
+    int head = 0, tail = 0;
+    room->nav[sy][sx] = 0;
+    queue[tail++] = (Uint16)(sy * LAYOUT_W + sx);
+    static const int DX[4] = { 1, -1, 0, 0 }, DY[4] = { 0, 0, 1, -1 };
+    while (head < tail) {
+        int c = queue[head++], cx = c % LAYOUT_W, cy = c / LAYOUT_W;
+        for (int k = 0; k < 4; k++) {
+            int nx = cx + DX[k], ny = cy + DY[k];
+            if (!layout_walkable(L, nx, ny) || room->nav[ny][nx] != NAV_FAR) continue;
+            room->nav[ny][nx] = (Uint16)(room->nav[cy][cx] + 1);
+            queue[tail++] = (Uint16)(ny * LAYOUT_W + nx);
+        }
+    }
+}
+
+/* La ligne droite de a à b ne traverse que des cases où l'on marche (avec un peu de largeur). */
+static bool clear_line(const RoomLayout *L, float ax, float ay, float bx, float by)
+{
+    float dx = bx - ax, dy = by - ay, len = sqrtf(dx * dx + dy * dy);
+    int steps = (int)(len / 10.0f) + 1;
+    for (int i = 0; i <= steps; i++) {
+        float t = (float)i / (float)steps, px = ax + dx * t, py = ay + dy * t;
+        for (int k = 0; k < 4; k++) {
+            float ox = (k & 1) ? 12.0f : -12.0f, oy = (k & 2) ? 9.0f : -9.0f;
+            int tx, ty;
+            if (layout_tile_at(L, px + ox, py + oy, &tx, &ty) && !layout_walkable(L, tx, ty)) return false;
+        }
+    }
+    return true;
+}
+
+void room_steer(const Room *room, float x, float y, float tx, float ty, float *sx, float *sy)
+{
+    *sx = tx;
+    *sy = ty;
+    const RoomLayout *L = room->layout;
+    int cx, cy;
+    if (!L || L->obstacle_count + layout_hole_count(L) == 0 || !layout_tile_at(L, x, y, &cx, &cy)) return;
+    if (clear_line(L, x, y, tx, ty)) return;
+    if (room->nav[cy][cx] == NAV_FAR) return;
+    /* Case voisine la plus proche de la cible (en diagonale seulement si les deux côtés sont libres). */
+    int best = room->nav[cy][cx] * 2, bx = -1, by = -1;   /* il faut une case plus proche que la sienne */
+    for (int oy = -1; oy <= 1; oy++) {
+        for (int ox = -1; ox <= 1; ox++) {
+            int nx = cx + ox, ny = cy + oy;
+            if ((ox == 0 && oy == 0) || nx < 0 || ny < 0 || nx >= L->w || ny >= L->h) continue;
+            if (!layout_walkable(L, nx, ny) || room->nav[ny][nx] == NAV_FAR) continue;
+            if (ox != 0 && oy != 0 && (!layout_walkable(L, cx + ox, cy) || !layout_walkable(L, cx, cy + oy))) continue;
+            int v = room->nav[ny][nx] * 2 + ((ox != 0 && oy != 0) ? 0 : 1);   /* à égalité, la diagonale coupe court */
+            if (v < best) {
+                best = v;
+                bx = nx;
+                by = ny;
+            }
+        }
+    }
+    if (bx < 0) {
+        /* Déjà dans la case de la cible, ou bloqué : vers le centre de sa propre case. */
+        if (room->nav[cy][cx] == 0) return;
+        bx = cx;
+        by = cy;
+    }
+    SDL_FRect t = layout_tile_rect(L, bx, by);
+    *sx = t.x + t.w * 0.5f;
+    *sy = t.y + t.h * 0.5f;
 }
 
 void room_clamp_to_floor(const Room *room, float mx, float my, float *x, float *y)

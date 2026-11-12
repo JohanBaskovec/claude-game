@@ -3,7 +3,7 @@
 > Document de travail destiné à Claude Code. Il décrit l'univers et les choix de design.
 > **Statut : en cours de conception.** Les sections marquées ✅ sont décidées, 💡 sont des idées à valider, ❓ sont des questions ouvertes.
 > **Source de vérité du design : ce fichier, dans le dépôt** (`docs/concept/GDD.md`). La conception se fait désormais uniquement avec Claude Code, qui le met à jour au fil des décisions prises avec Johan.
-> **Phase en cours : Phase 11 (section 20).** Les Phases 1 à 10 (sections 10 à 19) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
+> **Phase en cours : Phase 12 (section 21).** Les Phases 1 à 11 (sections 10 à 20) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
 
 ---
 
@@ -299,25 +299,25 @@ On découpe par **époques** plutôt que par siècles, car entre le IXe et le XI
 ### ✅ Sol en parchemin (remplace les dalles de pierre)
 - ✅ **Le sol n'est plus de la pierre mais le parchemin de la page** : c'est la page du livre de chœur qu'on foule, ce qui va avec « le niveau est une partition ».
 - 💡 Rendu proposé : peau crème un peu jaunie, grain fin et points des follicules, teinte irrégulière (plus sombre vers les bords de la page et dans le creux de la reliure) ; la **réglure** à la pointe sèche (lignes très fines qui guident l'écriture) et les **piqûres** dans la marge, comme sur les vrais manuscrits.
-- ❓ **Les murs** : à décider. Proposition de Claude : garder une **architecture**, mais **peinte sur la page** à la manière des *tables des canons* carolingiennes (colonnes et arcs dessinés à l'encre, aplats rouge, bleu et or), plutôt que des pierres réalistes. Les portes deviennent les arcs. Autre possibilité : la bordure enluminée de la page (entrelacs, rinceaux). Garder les briques actuelles reste possible, mais elles jurent un peu avec un sol en papier.
+- ✅ **Les murs** : on garde une **architecture**, mais **peinte sur la page** à la manière des *tables des canons* carolingiennes (colonnes et arcs dessinés à l'encre, aplats rouge, bleu et or), plutôt que des pierres réalistes. Les portes deviennent les arcs.
 
-### ❓ Rendre les salles plus vivantes
+### ✅ Rendre les salles plus vivantes
 - ✅ **Des trous dans le parchemin**, qui ressemblent à des trous dans du papier (bord déchiré, fibres, ombre ; on voit le noir ou la page du dessous). Fait réel : les parchemins ont souvent des trous, défauts de la peau, et les copistes écrivaient autour ; certains étaient recousus, voire brodés de soie.
-  - 💡 Comme les trous de TBOI : on ne peut pas marcher dessus, les notes passent au-dessus. Le texte du sol contourne les trous.
-  - 💡 Variantes : **trou recousu** (on peut passer sur la couture), **brûlure de chandelle** (bord noirci), **galerie du ver de livre** (le ver laisse un trou là où il sort).
-- 💡 **Obstacles** proposés (équivalents des rochers, pots, feux, TNT et pointes de TBOI), tous tirés du scriptorium :
-  - **sceaux de cire rouge** : les « rochers », indestructibles sauf au métronome ;
+  - ✅ Comme les trous de TBOI : on ne peut pas marcher dessus, les notes passent au-dessus. Le texte du sol contourne les trous.
+  - ✅ Variantes : **trou recousu** (on peut passer sur la couture), **brûlure de chandelle** (bord noirci), **galerie du ver de livre** (le ver perce un trou **à chaque fois** qu'il sort).
+- ✅ **Obstacles** (équivalents des rochers, pots, feux, TNT et pointes de TBOI), tous tirés du scriptorium :
+  - ~~sceaux de cire rouge comme « rochers »~~ : ✅ abandonné, un sceau c'est plat ; les sceaux deviennent des **éléments du décor** posés sur la page (voir « petites choses sur la page ») ;
   - **encriers** : cassables par les tirs, ils répandent une flaque d'encre (qui ralentit) ; parfois des royalties dedans ;
   - **chandelles** : les « feux », elles brûlent au contact ; un tir les éteint ; la cire fondue fait une flaque glissante ;
-  - **lettrines qui se dressent** : les grandes initiales rouges du texte sortent du sol et forment des blocs ; on peut les briser en éclats d'encre ;
+  - ~~lettrines qui se dressent~~ : ✅ abandonné (pas aimé en jeu) ;
   - **aiguilles du relieur** qui sortent du sol par intermittence : les « pointes » ;
   - **piles de livres**, **pierre ponce** et **grattoir** du copiste, **signet** (ruban qui traverse la salle comme un muret bas) ;
   - les **fils de la reliure** dans la colonne centrale (déjà en idée).
-- 💡 **Autres idées** :
-  - **plans de salles faits à la main**, comme TBOI (des dizaines de dispositions d'obstacles et d'ennemis), plutôt que des obstacles posés au hasard : c'est ce qui rend les salles de TBOI intéressantes ;
-  - **petites choses sur la page**, sans effet : fleur séchée pressée entre les pages, mouche écrasée, cheveu, tache de vin, empreinte de doigt, neumes raturés, *marginalia* dessinées dans les marges (lapin, escargot chevalier) ;
-  - **salles secrètes** derrière un mur qu'on fait sauter au métronome ;
-  - **salles sombres** éclairées par les chandelles.
+- **Autres idées** :
+  - 💡 **plans de salles faits à la main**, comme TBOI (des dizaines de dispositions d'obstacles et d'ennemis), plutôt que des obstacles posés au hasard : **plus tard** ;
+  - ✅ **petites choses sur la page**, sans effet : fleur séchée pressée entre les pages, mouche écrasée, cheveu, tache de vin, empreinte de doigt, neumes raturés, **sceaux de cire** écrasés à plat sur la page avec leurs queues de parchemin, *marginalia* dessinées dans les marges (lapin, escargot chevalier) ;
+  - 💡 **salles secrètes** derrière un mur qu'on fait sauter au métronome : **plus tard** ;
+  - ✅ **salles sombres** éclairées par les chandelles.
 
 ### ✅ Police du sol
 - **Junicode**, version 2.211, de Peter S. Baker. Police libre sous licence **SIL Open Font License 1.1** : utilisable et redistribuable dans un jeu commercial, à condition de joindre la licence.
@@ -649,6 +649,7 @@ Le Gros Bébé, les objets, les armes, les prix, les meubles (lutrins, coffre, t
 ### Ver de livre ✅
 - Sous le sol, il est invisible et intouchable (les portes restent fermées tant qu'il vit).
 - Cycle : caché (1 à 2 s) → **le sol se soulève et se fissure** là où se trouve Amadeus, à 24 px près (0,9 s, pour avoir le temps de s'écarter) → il **jaillit** (blesse au contact) → reste dehors 1,4 s, où on peut le toucher → replonge (0,25 s) → caché.
+- ✅ (Phase 12) **Il perce toujours un trou dans le parchemin en sortant** : plus on le laisse vivre, plus la salle se troue. Il faut l'éliminer vite. Voir §21.
 - Larve pâle de ver de livre, avec de petites lunettes rondes. 4 PV. Les tirs ne le repoussent pas ; étourdi, il reste dehors.
 
 ### Sonneur de cloche ✅
@@ -744,7 +745,7 @@ Les taches qui restent quand on revient dans une salle, les morceaux d'ennemis (
 ### Hors périmètre (ne pas faire)
 Les autres sons (dégâts, morts, métronome, ennemis, interface), les sons des instruments, la musique, le réglage du volume dans un menu.
 
-## 20. PHASE 11 — Bruitages : ramassage, morts, métronome, ennemis
+## 20. PHASE 11 — Bruitages : ramassage, morts, métronome, ennemis ✅ (terminée)
 
 **But** : les premiers bruitages, en plus du chant. Toujours synthétisés par le jeu, sans fichier audio.
 
@@ -768,3 +769,45 @@ Les autres sons (dégâts, morts, métronome, ennemis, interface), les sons des 
 
 ### Hors périmètre (ne pas faire)
 Les autres sons (dégâts reçus, mort d'Amadeus, atterrissage du boss, briques, encre qui tombe au sol, ver qui replonge, portes, objets, interface), les sons des instruments, la musique, le réglage du volume dans un menu.
+
+## 21. PHASE 12 — Parchemin, murs peints, trous et obstacles
+
+**But** : changer l'aspect du premier étage (§9 « Sol en parchemin ») et rendre les salles plus vivantes (§9 « Rendre les salles plus vivantes »).
+
+### Décor ✅
+- **Sol en parchemin** à la place des dalles : peau crème, grain, follicules, teinte irrégulière, réglure à la pointe sèche sous chaque ligne de texte et piqûres dans la marge extérieure.
+- **Murs peints** façon tables des canons : colonnes marbrées avec chapiteau et base, arcs entre les colonnes, fonds bleu lapis, écoinçons rouges, bord doré cerné d'encre. Les portes sont des arcs à claveaux peints, rouges et blancs ; le bois des portes fermées reste.
+- **Petites choses sur la page**, sans effet de jeu : fleur séchée, mouche écrasée, cheveu, tache de vin, empreinte de doigt, neumes raturés ; *marginalia* (lapin, escargot chevalier) dans les marges.
+- **Sceaux de cire** à plat sur la page (rouges, verts ou bruns), avec leurs deux queues de parchemin, un bourrelet en relief et l'empreinte de la matrice (grènetis et croix) : du décor, pas un obstacle.
+
+### Grille des salles ✅
+- Chaque cellule est une grille de **16 × 9 cases de 48 × 40 px**. Trous et obstacles occupent des cases, tirés au hasard avec la graine de l'étage (même graine = mêmes salles), souvent en **symétrie** pour que la salle ait l'air composée.
+- Seulement dans les **salles normales** : rien dans la salle de départ, la salle du trésor et la salle du boss.
+- **Règle d'accès** : on peut aller de **chaque porte à chaque porte** à pied. Plus fort encore, toutes les cases où l'on peut marcher sont reliées entre elles : aucun ennemi ne peut apparaître enfermé. Pour cette vérification, tout obstacle compte comme infranchissable, même s'il se casse. Une disposition qui casserait la règle est refusée.
+- Les cases devant chaque porte et le centre de chaque cellule (prix, téléportation) restent libres.
+- Les ennemis contournent les obstacles et les trous : ils suivent le chemin le plus court vers le joueur quand la ligne droite est bouchée.
+
+### Trous ✅
+- Trou déchiré (bord fibreux, ombre, noir dedans), **brûlure** (bord noirci), **trou recousu** (fente traversée de points de couture : on peut marcher dessus).
+- On ne marche pas sur un trou ; les notes et les tirs ennemis passent au-dessus.
+- Le texte du sol contourne les trous.
+- **Ver de livre** : il perce **toujours** un trou rond en sortant, **sans limite** : le laisser vivre troue la salle, il faut l'éliminer vite. Il choisit donc sa sortie sur la case la plus proche d'Amadeus où un trou **ne bouche aucun chemin** (même règle d'accès, en comptant aussi les trous que vont percer les autres vers déjà annoncés). Pas deux vers sur la même case. S'il ne reste aucune case possible, il ressort par un trou de ver déjà percé. Ceux qui se tenaient sur la case sont poussés au bord. Ces trous restent quand on revient.
+
+### Obstacles ✅
+| Obstacle | Marcher | Tirs | Se casse |
+|---|---|---|---|
+| Pile de livres | bloque | bloque | métronome |
+| Encrier | bloque | bloque | tirs ou métronome : flaque d'encre (ralentit les ennemis), parfois des royalties |
+| Chandelle | bloque, brûle au contact | un tir l'éteint | métronome ; éteinte, elle laisse une flaque de cire glissante |
+| Aiguilles du relieur | on peut marcher dessus ; blessent quand elles sortent (par intermittence, annoncées) | passent | non |
+| Signet (ruban) | bloque (muret bas) | passent au-dessus | non |
+| Fils de la reliure | bloquent (muret bas, dans la colonne de la reliure) | passent au-dessus | non |
+
+- Les objets qui font passer les notes au-dessus des obstacles (*Altius*) les font aussi passer au-dessus de ceux-ci.
+- Sprites provisoires des obstacles faits par Claude (`assets/sprites/obstacles/`), à remplacer.
+
+### Salles sombres ✅
+- Quelques salles normales sont **plongées dans le noir** : on y voit autour d'Amadeus, des chandelles allumées (la lumière vacille) et des notes en vol. Éteindre une chandelle assombrit la salle.
+
+### Hors périmètre (ne pas faire)
+Plans de salles faits à la main, salles secrètes, sons des obstacles, autres époques.

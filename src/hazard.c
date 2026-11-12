@@ -46,14 +46,19 @@ Hazard *hazard_spawn_toxic(HazardPool *pool, float x, float y)
     return spawn_puddle(pool, HAZARD_TOXIC, x, y);
 }
 
+Hazard *hazard_spawn_wax(HazardPool *pool, float x, float y)
+{
+    return spawn_puddle(pool, HAZARD_WAX, x, y);
+}
+
 static float puddle_radius(HazardType type)
 {
-    return type == HAZARD_TOXIC ? tuning.toxic_radius : tuning.ink_radius;
+    return type == HAZARD_TOXIC ? tuning.toxic_radius : type == HAZARD_WAX ? tuning.wax_radius : tuning.ink_radius;
 }
 
 static float puddle_time(HazardType type)
 {
-    return type == HAZARD_TOXIC ? tuning.toxic_time : tuning.ink_time;
+    return type == HAZARD_TOXIC ? tuning.toxic_time : type == HAZARD_WAX ? 1e9f : tuning.ink_time;
 }
 
 bool hazard_in(const HazardPool *pool, HazardType type, float x, float y)
@@ -107,6 +112,18 @@ void hazard_render_ground(const Hazard *h, SDL_Renderer *r, Camera cam)
         float ir = tuning.ink_radius * (0.6f + 0.4f * SDL_min(h->timer / 0.1f, 1.0f));
         draw_ellipse(r, x, y, ir, ir * 0.5f, (SDL_Color){ 26, 30, 64, (Uint8)(200.0f * u) });
         draw_ellipse(r, x - ir * 0.3f, y - ir * 0.1f, ir * 0.25f, ir * 0.1f, (SDL_Color){ 90, 100, 150, (Uint8)(120.0f * u) });
+        return;
+    }
+    if (h->type == HAZARD_WAX) {
+        /* Cire blanche figée, en coulures autour du point où était la chandelle, avec un reflet. */
+        float ir = tuning.wax_radius * (0.5f + 0.5f * SDL_min(h->timer / 0.25f, 1.0f));
+        draw_ellipse(r, x, y, ir + 1.0f, ir * 0.5f + 1.0f, (SDL_Color){ 170, 150, 110, 200 });
+        draw_ellipse(r, x, y, ir, ir * 0.5f, (SDL_Color){ 238, 228, 196, 235 });
+        for (int k = 0; k < 5; k++) {
+            float a = (float)k * 1.26f + h->x * 0.1f;
+            draw_ellipse(r, x + cosf(a) * ir * 0.85f, y + sinf(a) * ir * 0.42f, ir * 0.3f, ir * 0.16f, (SDL_Color){ 238, 228, 196, 235 });
+        }
+        draw_ellipse(r, x - ir * 0.3f, y - ir * 0.12f, ir * 0.35f, ir * 0.1f, (SDL_Color){ 255, 252, 236, 220 });
         return;
     }
     if (h->type == HAZARD_TOXIC) {

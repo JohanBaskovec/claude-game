@@ -18,6 +18,7 @@ typedef enum SheetId {
     SHEET_WORM_HOLE,
     SHEET_RINGER,
     SHEET_BELL,
+    SHEET_OBSTACLES,
     SHEET_COUNT
 } SheetId;
 
@@ -35,6 +36,9 @@ static const struct { const char *file; int cell_w, cell_h; } SHEETS[SHEET_COUNT
     [SHEET_WORM_HOLE] = { "assets/sprites/worm/worm_hole.png", 48, 24 },
     [SHEET_RINGER]    = { "assets/sprites/bellringer/bellringer.png", 36, 60 },
     [SHEET_BELL]      = { "assets/sprites/bellringer/bell.png", 28, 28 },
+    /* Obstacles de la phase 12 (planche provisoire) : une case = une case du sol (48 px de large),
+     * le centre de la case au sol est à 8 px du bas. */
+    [SHEET_OBSTACLES] = { "assets/sprites/obstacles/obstacles.png", 48, 64 },
 };
 
 typedef struct SpriteDef {
@@ -87,6 +91,14 @@ static const SpriteDef DEFS[SPR_COUNT] = {
     [SPR_BELL]            = DEF_PNG(SHEET_BELL, 0),
     [SPR_BELL_LEFT]       = DEF_PNG(SHEET_BELL, 1),
     [SPR_BELL_RIGHT]      = DEF_PNG(SHEET_BELL, 2),
+    [SPR_BOOKS_0]         = DEF_PNG(SHEET_OBSTACLES, 0),
+    [SPR_BOOKS_1]         = DEF_PNG(SHEET_OBSTACLES, 1),
+    [SPR_INKWELL]         = DEF_PNG(SHEET_OBSTACLES, 2),
+    [SPR_CANDLE_0]        = DEF_PNG(SHEET_OBSTACLES, 3),
+    [SPR_CANDLE_1]        = DEF_PNG(SHEET_OBSTACLES, 4),
+    [SPR_NEEDLES_IN]      = DEF_PNG(SHEET_OBSTACLES, 5),
+    [SPR_NEEDLES_TIPS]    = DEF_PNG(SHEET_OBSTACLES, 6),
+    [SPR_NEEDLES_OUT]     = DEF_PNG(SHEET_OBSTACLES, 7),
 };
 
 #define MAX_SPRITE_PIXELS (64 * 64)

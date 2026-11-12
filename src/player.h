@@ -34,6 +34,7 @@ typedef struct Player {
     float     charge_x, charge_y; /* direction du tir en charge (vecteur unitaire) */
     float     lock_timer;   /* > 0 : cloué sur place (orgue) */
     float     walk_phase;   /* animation de marche : avance d'un temps tous les player_step_dist px */
+    bool      slipping;     /* sur la cire : il glisse (réglé par game.c avant chaque pas) */
 } Player;
 
 /* Tir demandé par le joueur pendant un pas. */
