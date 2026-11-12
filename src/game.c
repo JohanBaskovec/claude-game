@@ -78,6 +78,8 @@ void game_init(Game *g, Uint64 seed)
 {
     player_init(&g->player, 0.0f, 0.0f);
     g->deaths = 0;
+    g->reveal_map = false;
+    g->map_hover = -1;
     start_floor(g, seed);
 }
 
@@ -122,6 +124,22 @@ static void start_transition(Game *g, const RoomDoor *door)
         room_center(&next, &ex, &ey);   /* ne devrait pas arriver */
     }
     enter_room(g, door->target, ex, ey);
+}
+
+bool game_can_teleport(const Game *g, int room)
+{
+    if (room < 0 || room >= g->floor.room_count || g->transition.active) return false;
+    if (g->reveal_map) return true;
+    return g->floor.rooms[room].visited && enemy_count(&g->enemies) == 0;
+}
+
+bool game_teleport(Game *g, int room, int cx, int cy)
+{
+    if (!game_can_teleport(g, room) || floor_room_at(&g->floor, cx, cy) != room) return false;
+    float x = (cx + 0.5f) * CELL_W, y = (cy + 0.5f) * CELL_H;
+    g->player.vx = g->player.vy = 0.0f;
+    enter_room(g, room, x, y);
+    return true;
 }
 
 static void fire(Game *g, Dir dir)
@@ -275,5 +293,6 @@ void game_render(const Game *g, SDL_Renderer *r, float alpha)
     }
 
     hud_render(&g->hud, r, &g->player.stats);
-    minimap_render(&g->floor, g->room.index, r);
+    int hover = game_can_teleport(g, g->map_hover) ? g->map_hover : -1;
+    minimap_render(&g->floor, g->room.index, r, g->reveal_map, hover);
 }

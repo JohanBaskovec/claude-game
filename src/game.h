@@ -31,6 +31,10 @@ typedef struct Game {
     Hud            hud;
     Transition     transition;
     int            deaths;     /* compteur, pour le debug */
+
+    /* Affichage de la mini-carte, réglé par la fenêtre (souris, menu de debug). */
+    bool           reveal_map; /* toute la carte visible et téléportation partout (debug) */
+    int            map_hover;  /* salle survolée sur la mini-carte, -1 si aucune */
 } Game;
 
 /* Nouvelle partie sur un étage généré avec cette graine. */
@@ -42,6 +46,13 @@ void game_new_floor(Game *g, Uint64 seed);
 
 /* Un pas de logique à durée fixe. */
 void game_step(Game *g, const Input *in, float dt);
+
+/* Téléportation par la mini-carte (GDD §12) : vers une salle visitée, hors combat.
+ * Avec reveal_map (debug) : vers n'importe quelle salle, à tout moment. */
+bool game_can_teleport(const Game *g, int room);
+
+/* Téléporte au centre de la cellule (cx, cy) de la salle. Renvoie false si interdit. */
+bool game_teleport(Game *g, int room, int cx, int cy);
 
 void game_spawn_baby(Game *g);
 void game_kill_enemies(Game *g);

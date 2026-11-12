@@ -31,7 +31,8 @@ cmake --build build-web -j
 | ZQSD (AZERTY) / WASD (QWERTY) | Se déplacer (touches lues par position physique) |
 | Flèches | Chanter (tirer) — la dernière flèche enfoncée l'emporte |
 | F1 | Infos de debug (FPS, graine de l'étage, salle actuelle) |
-| F2 | Menu de debug : attributs du joueur modifiables à la souris (− / +, maintenir pour répéter), ajouter un bébé, nouvel étage, tuer les ennemis |
+| Clic sur la mini-carte | Se téléporter dans une salle déjà visitée (hors combat) |
+| F2 | Menu de debug : attributs du joueur modifiables à la souris (− / +, maintenir pour répéter), ajouter un bébé, nouvel étage, tuer les ennemis ; carte entière visible et téléportation partout |
 | F11 | Plein écran |
 | Échap | Quitter |
 

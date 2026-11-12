@@ -367,6 +367,7 @@ Autres ennemis, objets, salles multiples, écran de mort, sons, graphismes finau
 
 ### Portes sans serrure ✅
 - Les portes se **ferment** quand on entre dans une salle qui contient des ennemis, et s'**ouvrent** quand elle est vidée.
+- Ouvertures : 84 px pour les portes du haut et du bas, 64 px pour celles des côtés (validé en jeu).
 - Une salle vidée le reste : on la retraverse librement.
 - Les portes à serrure (clés de sol, de fa, d'ut) viendront plus tard.
 
@@ -381,13 +382,14 @@ Autres ennemis, objets, salles multiples, écran de mort, sons, graphismes finau
 ### Mini-carte ✅
 - En haut à droite : la double page en miniature, reliure comprise.
 - Salles **visitées** éclairées, salle **actuelle** en rose, salles **découvertes** (voisines d'une salle visitée) en sombre, les autres invisibles. La salle du boss est marquée dès qu'elle est découverte.
+- ✅ **Téléportation** : un clic sur une salle **déjà visitée** de la mini-carte y téléporte le joueur, au centre de la cellule cliquée. **Interdit pendant un combat** (tant qu'il reste des ennemis dans la salle), sinon on pourrait fuir n'importe quel combat. La salle survolée par la souris est entourée de blanc si on peut s'y téléporter.
 
 ### Mort ✅
 - À 0 PV, on recommence sur un **nouvel étage** (nouvelle graine). Les attributs réglés dans le menu de debug sont conservés.
 
 ### Debug
 - **F1** affiche la graine et la salle actuelle.
-- **F2** : boutons « Nouvel étage » et « Tuer les ennemis ».
+- **F2** : boutons « Nouvel étage » et « Tuer les ennemis ». Quand le menu est ouvert, la mini-carte montre **tout l'étage** (salles inconnues en contour) et permet de se téléporter **partout**, même en combat. Le menu s'affiche sous la mini-carte pour la laisser cliquable.
 
 ### Hors périmètre (ne pas faire)
 Sol en double page (texte latin, reliure), portes à serrure, salles spéciales autres que le boss, vrai boss, passage à l'étage suivant, objets, sons, graphismes finaux.

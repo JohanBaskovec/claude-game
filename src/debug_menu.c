@@ -1,5 +1,6 @@
 #include "debug_menu.h"
 #include "config.h"
+#include "minimap.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -45,7 +46,7 @@ static const StatRow ROWS[] = {
 #define GLYPH     8.0f
 #define PANEL_W   308.0f
 #define PANEL_X   (GAME_W - PANEL_W - 8.0f)
-#define PANEL_Y   8.0f
+#define PANEL_Y   (minimap_bottom() + 10.0f)   /* sous la mini-carte, qui reste cliquable */
 #define ROWS_Y    (PANEL_Y + 30.0f)
 #define ROW_H     24.0f
 #define BTN_W     20.0f
@@ -54,8 +55,8 @@ static const StatRow ROWS[] = {
 #define PLUS_X    (PANEL_X + 280.0f)
 #define VALUE_END (PANEL_X + 248.0f)
 #define RESET_Y   (ROWS_Y + ROW_COUNT * ROW_H + 6.0f)
-#define RESET_W   136.0f
-#define BABY_W    144.0f
+#define RESET_W   142.0f
+#define BABY_W    142.0f
 #define ACTION2_Y (RESET_Y + BTN_H + 6.0f)
 #define PANEL_H   (ACTION2_Y + BTN_H + 10.0f - PANEL_Y)
 

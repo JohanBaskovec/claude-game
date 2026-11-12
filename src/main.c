@@ -13,6 +13,7 @@
 #include "debug_menu.h"
 #include "game.h"
 #include "input.h"
+#include "minimap.h"
 
 #define TICK_NS       (SDL_NS_PER_SECOND / TICK_HZ)
 #define MAX_FRAME_NS  (SDL_NS_PER_SECOND / 4)   /* au-delà, on ralentit plutôt que d'enchaîner les pas */
@@ -158,6 +159,15 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     /* Souris : passage des coordonnées fenêtre aux coordonnées du jeu (960x540). */
     SDL_Event local = *event;
     SDL_ConvertEventToRenderCoordinates(app->renderer, &local);
+    /* Clic sur la mini-carte : téléportation. */
+    if (local.type == SDL_EVENT_MOUSE_BUTTON_DOWN && local.button.button == SDL_BUTTON_LEFT) {
+        int cx, cy;
+        int room = minimap_room_at(&app->game.floor, local.button.x, local.button.y, app->game.reveal_map, &cx, &cy);
+        if (room >= 0) {
+            game_teleport(&app->game, room, cx, cy);
+        }
+    }
+
     switch (debug_menu_handle_event(&app->debug, &local, &app->game.player.stats)) {
     case DEBUG_ACTION_SPAWN_BABY:    game_spawn_baby(&app->game); break;
     case DEBUG_ACTION_NEW_FLOOR:     game_new_floor(&app->game, random_seed()); break;
@@ -185,6 +195,13 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         app->accumulator_ns -= TICK_NS;
     }
     float alpha = (float)app->accumulator_ns / (float)TICK_NS;
+
+    /* Mini-carte : toute la carte quand le menu de debug est ouvert, salle survolée par la souris. */
+    float mx, my, lx, ly;
+    SDL_GetMouseState(&mx, &my);
+    SDL_RenderCoordinatesFromWindow(app->renderer, mx, my, &lx, &ly);
+    app->game.reveal_map = app->debug.open;
+    app->game.map_hover = minimap_room_at(&app->game.floor, lx, ly, app->game.reveal_map, NULL, NULL);
 
     render(app, alpha);
 
