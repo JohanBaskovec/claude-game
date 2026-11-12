@@ -46,6 +46,11 @@ static int initial_scale(void)
     return scale;
 }
 
+static Uint64 random_seed(void)
+{
+    return ((Uint64)SDL_rand_bits() << 32) | SDL_rand_bits();
+}
+
 static void step(App *app, float dt)
 {
     debug_menu_update(&app->debug, dt, &app->game.player.stats);
@@ -65,6 +70,11 @@ static void render(App *app, float alpha)
 
     if (app->show_debug) {
         SDL_SetRenderDrawColor(r, 255, 255, 255, 255);
+        const FloorRoom *fr = &g->floor.rooms[g->room.index];
+        SDL_RenderDebugTextFormat(r, 8, GAME_H - 42, "graine %llu  salle %d/%d (%s, %d bebes, profondeur %d)%s",
+                                  (unsigned long long)g->floor.seed, g->room.index + 1, g->floor.room_count,
+                                  floor_shape_name(fr->shape), fr->babies, fr->depth,
+                                  fr->kind == ROOM_BOSS ? "  BOSS" : fr->kind == ROOM_START ? "  DEPART" : "");
         SDL_RenderDebugTextFormat(r, 8, GAME_H - 30, "FPS %.0f  notes %d  ennemis %d  morts %d",
                                   app->fps, projectile_count(&g->shots), enemy_count(&g->enemies), g->deaths);
         SDL_RenderDebugTextFormat(r, 8, GAME_H - 18, "joueur v=(%.0f, %.0f)  PV %d/%d  invincible %.2fs",
@@ -105,7 +115,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_SetRenderVSync(app->renderer, 1);
 
     SDL_srand(0);   /* graine aléatoire tirée de l'horloge */
-    game_init(&app->game);
+    game_init(&app->game, random_seed());
     debug_menu_init(&app->debug);
 
     app->last_ns = SDL_GetTicksNS();
@@ -148,8 +158,11 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     /* Souris : passage des coordonnées fenêtre aux coordonnées du jeu (960x540). */
     SDL_Event local = *event;
     SDL_ConvertEventToRenderCoordinates(app->renderer, &local);
-    if (debug_menu_handle_event(&app->debug, &local, &app->game.player.stats) == DEBUG_ACTION_SPAWN_BABY) {
-        game_spawn_baby(&app->game);
+    switch (debug_menu_handle_event(&app->debug, &local, &app->game.player.stats)) {
+    case DEBUG_ACTION_SPAWN_BABY:    game_spawn_baby(&app->game); break;
+    case DEBUG_ACTION_NEW_FLOOR:     game_new_floor(&app->game, random_seed()); break;
+    case DEBUG_ACTION_KILL_ENEMIES:  game_kill_enemies(&app->game); break;
+    default: break;
     }
     return SDL_APP_CONTINUE;
 }

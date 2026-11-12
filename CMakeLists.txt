@@ -42,9 +42,11 @@ add_executable(fugue
     src/config.c
     src/debug_menu.c
     src/enemy.c
+    src/floor.c
     src/game.c
     src/hud.c
     src/input.c
+    src/minimap.c
     src/player.c
     src/projectile.c
     src/room.c

@@ -37,7 +37,9 @@ static const StatRow ROWS[] = {
 /* Identifiants des boutons : ligne*2 = moins, ligne*2+1 = plus, puis les boutons d'action. */
 #define BTN_RESET (ROW_COUNT * 2)
 #define BTN_BABY  (ROW_COUNT * 2 + 1)
-#define BTN_COUNT (ROW_COUNT * 2 + 2)
+#define BTN_FLOOR (ROW_COUNT * 2 + 2)
+#define BTN_KILL  (ROW_COUNT * 2 + 3)
+#define BTN_COUNT (ROW_COUNT * 2 + 4)
 
 /* Mise en page, en pixels du jeu. La police de debug fait 8x8 px. */
 #define GLYPH     8.0f
@@ -52,15 +54,18 @@ static const StatRow ROWS[] = {
 #define PLUS_X    (PANEL_X + 280.0f)
 #define VALUE_END (PANEL_X + 248.0f)
 #define RESET_Y   (ROWS_Y + ROW_COUNT * ROW_H + 6.0f)
-#define RESET_W   152.0f
-#define BABY_W    128.0f
-#define PANEL_H   (RESET_Y + BTN_H + 10.0f - PANEL_Y)
+#define RESET_W   136.0f
+#define BABY_W    144.0f
+#define ACTION2_Y (RESET_Y + BTN_H + 6.0f)
+#define PANEL_H   (ACTION2_Y + BTN_H + 10.0f - PANEL_Y)
 
 #define REPEAT_DELAY 0.40f  /* s avant la répétition automatique */
 #define REPEAT_EVERY 0.06f  /* s entre deux répétitions */
 
 static const char *RESET_LABEL = "Valeurs de depart";
 static const char *BABY_LABEL  = "Ajouter un bebe";
+static const char *FLOOR_LABEL = "Nouvel etage";
+static const char *KILL_LABEL  = "Tuer les ennemis";
 
 static SDL_FRect button_rect(int id)
 {
@@ -69,6 +74,12 @@ static SDL_FRect button_rect(int id)
     }
     if (id == BTN_BABY) {
         return (SDL_FRect){ PANEL_X + PANEL_W - 10.0f - BABY_W, RESET_Y, BABY_W, BTN_H };
+    }
+    if (id == BTN_FLOOR) {
+        return (SDL_FRect){ PANEL_X + 10.0f, ACTION2_Y, RESET_W, BTN_H };
+    }
+    if (id == BTN_KILL) {
+        return (SDL_FRect){ PANEL_X + PANEL_W - 10.0f - BABY_W, ACTION2_Y, BABY_W, BTN_H };
     }
     int row = id / 2;
     float y = ROWS_Y + (float)row * ROW_H;
@@ -136,9 +147,9 @@ static DebugAction press(int id, PlayerStats *st)
         *st = player_start_stats();
         return DEBUG_ACTION_NONE;
     }
-    if (id == BTN_BABY) {
-        return DEBUG_ACTION_SPAWN_BABY;
-    }
+    if (id == BTN_BABY)  return DEBUG_ACTION_SPAWN_BABY;
+    if (id == BTN_FLOOR) return DEBUG_ACTION_NEW_FLOOR;
+    if (id == BTN_KILL)  return DEBUG_ACTION_KILL_ENEMIES;
     const StatRow *row = &ROWS[id / 2];
     float v = get_value(row, st) + ((id % 2 == 0) ? -row->step : row->step);
     v = roundf(v / row->step) * row->step;   /* évite la dérive des flottants */
@@ -269,4 +280,6 @@ void debug_menu_render(const DebugMenu *m, SDL_Renderer *r, const PlayerStats *s
 
     draw_button(r, m, BTN_RESET, RESET_LABEL, true);
     draw_button(r, m, BTN_BABY, BABY_LABEL, true);
+    draw_button(r, m, BTN_FLOOR, FLOOR_LABEL, true);
+    draw_button(r, m, BTN_KILL, KILL_LABEL, true);
 }

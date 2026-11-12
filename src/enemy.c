@@ -33,13 +33,13 @@ Enemy *enemy_spawn_baby(EnemyPool *pool, float x, float y)
 
 Enemy *enemy_spawn_baby_away_from(EnemyPool *pool, const Room *room, float avoid_x, float avoid_y)
 {
-    const float margin = 30.0f;
+    const float margin = 40.0f;
     float x = 0.0f, y = 0.0f;
     /* Quelques tirages au hasard ; à défaut, le point du sol le plus éloigné testé. */
     float best_d2 = -1.0f;
     for (int attempt = 0; attempt < 32; attempt++) {
-        float cx = room->floor.x + margin + SDL_randf() * (room->floor.w - 2.0f * margin);
-        float cy = room->floor.y + margin + SDL_randf() * (room->floor.h - 2.0f * margin);
+        float cx, cy;
+        room_random_floor_point(room, margin, &cx, &cy);
         float d2 = (cx - avoid_x) * (cx - avoid_x) + (cy - avoid_y) * (cy - avoid_y);
         if (d2 > best_d2) {
             best_d2 = d2;
@@ -157,10 +157,10 @@ static void fill(SDL_Renderer *r, float x, float y, float w, float h, SDL_Color 
  * Placeholder du bébé médiéval (GDD §4) : proportions d'adulte (petite tête,
  * corps raide dans son lange), carnation ocre, nimbe doré, visage de vieillard.
  */
-void enemy_render(const Enemy *e, SDL_Renderer *r, float alpha)
+void enemy_render(const Enemy *e, SDL_Renderer *r, float alpha, Camera cam)
 {
-    float x = e->prev_x + (e->box.x - e->prev_x) * alpha;
-    float y = e->prev_y + (e->box.y - e->prev_y) * alpha;
+    float x = e->prev_x + (e->box.x - e->prev_x) * alpha - cam.x;
+    float y = e->prev_y + (e->box.y - e->prev_y) * alpha - cam.y;
     float cx = x + e->box.w * 0.5f;
     float feet = y + e->box.h;
     float bob = (SDL_fmodf(e->anim_time, 0.5f) < 0.25f) ? 0.0f : -2.0f;   /* dandinement */

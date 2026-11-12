@@ -126,10 +126,10 @@ static void fill(SDL_Renderer *r, float x, float y, float w, float h,
  * corps cyan, tête couleur peau, casque rose, bouche qui s'ouvre au tir.
  * Les pieds sont posés sur le bas de la boîte de collision.
  */
-void player_render(const Player *p, SDL_Renderer *renderer, float alpha)
+void player_render(const Player *p, SDL_Renderer *renderer, float alpha, Camera cam)
 {
-    float x = p->prev_x + (p->box.x - p->prev_x) * alpha;
-    float y = p->prev_y + (p->box.y - p->prev_y) * alpha;
+    float x = p->prev_x + (p->box.x - p->prev_x) * alpha - cam.x;
+    float y = p->prev_y + (p->box.y - p->prev_y) * alpha - cam.y;
     float cx = x + p->box.w * 0.5f;
     float feet = y + p->box.h;
 

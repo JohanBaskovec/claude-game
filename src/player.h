@@ -42,6 +42,6 @@ void player_center(const Player *p, float *x, float *y);
 bool player_hurt(Player *p, int damage);
 
 /* alpha : fraction entre le pas précédent et le pas courant (0..1). */
-void player_render(const Player *p, SDL_Renderer *renderer, float alpha);
+void player_render(const Player *p, SDL_Renderer *renderer, float alpha, Camera cam);
 
 #endif

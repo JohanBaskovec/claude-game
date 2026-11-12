@@ -33,6 +33,15 @@ Tuning tuning = {
     .enemy_hurt_flash    = 0.12f,
     .enemy_spawn_min_dist = 260.0f,
 
+    .floor_min_rooms            = 10,
+    .floor_max_rooms            = 12,
+    .floor_big_room_chance      = 0.35f,
+    .floor_min_big_rooms        = 1,
+    .room_max_babies            = 4,
+    .room_babies_per_extra_cell = 2,
+    .boss_room_babies           = 6,
+    .room_transition_time       = 0.30f,
+
     .hud_bar_base_len   = 120.0f,
     .hud_bar_len_per_hp = 2.5f,
     .hud_bar_drain_time = 0.30f,

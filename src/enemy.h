@@ -45,6 +45,6 @@ int enemy_count(const EnemyPool *pool);
 /* Bas de la boîte de collision, pour trier l'affichage par profondeur. */
 float enemy_feet_y(const Enemy *e, float alpha);
 
-void enemy_render(const Enemy *e, SDL_Renderer *renderer, float alpha);
+void enemy_render(const Enemy *e, SDL_Renderer *renderer, float alpha, Camera cam);
 
 #endif

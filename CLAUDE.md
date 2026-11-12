@@ -34,10 +34,14 @@ Web : `emcmake cmake -S . -B build-web` (Emscripten non installé pour l'instant
 ## Code
 
 - `src/config.h` / `config.c` : **tous** les paramètres de gameplay dans la struct globale `tuning`. Un nouveau réglage va là, pas en dur dans le code.
-- `game.c` : état d'une partie (`Game`) et règles (collisions entre entités, dégâts, mort). `main.c` ne contient que la plomberie SDL (fenêtre, événements, boucle, debug).
+- `game.c` : état d'une partie (`Game`) et règles (collisions entre entités, dégâts, mort, changement de salle). `main.c` ne contient que la plomberie SDL (fenêtre, événements, boucle, debug).
+- `floor.c` : plan de l'étage (topologie seule : salles, formes, portes, graine). `room.c` : géométrie de la salle courante construite depuis le plan (murs, portes, caméra, rendu).
+- **Coordonnées du monde = coordonnées « page » du GDD** : le sol de la cellule (cx, cy) est en (cx*768, cy*360). Tout rendu dans le monde prend une `Camera` (écran = monde − caméra) ; le HUD, la mini-carte et le debug sont en coordonnées écran.
+- Graines : `floor_generate` mélange la graine (splitmix64) car le générateur de SDL donne des premiers tirages identiques pour les petites graines. Tout aléatoire de génération passe par `SDL_rand_r` sur cet état, pour que même graine = même étage.
 - Attributs du joueur (PV, PV max, vitesse, cadence, dégâts, vitesse et portée des tirs) : `tuning.start_*` = valeurs de départ, `player.stats` (`PlayerStats`) = valeurs courantes. Le gameplay lit toujours `player.stats`. Un nouvel attribut s'ajoute aussi au tableau `ROWS` de `debug_menu.c`.
 - Outils de debug : F1 (infos), F2 (menu des attributs et actions comme « Ajouter un bébé », `debug_menu.c` ; une action renvoie un `DebugAction` que `main.c` exécute). La police de debug SDL est en ASCII : pas d'accents dans ces textes.
-- Un module par entité (`player`, `enemy`, `projectile`, `room`, `hud`, `input`, `debug_menu`), chacun avec `_init`, `_update`, `_render`.
+- Un module par entité (`player`, `enemy`, `projectile`, `room`, `floor`, `hud`, `minimap`, `input`, `debug_menu`), chacun avec `_init`, `_update`, `_render`.
+- Piège : `DIR_NONE` vaut -1, donc un `Input` initialisé à zéro signifie « tirer vers le haut ». Toujours écrire `{ 0, 0, DIR_NONE }`.
 - Comparaisons de minuteries flottantes (cadence, invincibilité) : utiliser une petite tolérance (`1e-4f`), sinon un arrondi décale d'une image.
 - Coordonnées en pixels du jeu (960×540), temps en secondes, vitesses en px/s.
 - Commentaires et textes en français. Le jeu sera bilingue FR/EN : pas de texte affiché en dur dans le code une fois qu'il y aura du texte.

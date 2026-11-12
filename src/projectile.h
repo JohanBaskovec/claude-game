@@ -28,7 +28,7 @@ bool projectile_spawn(ProjectilePool *pool, float x, float y, float vx, float vy
 
 void projectile_update_all(ProjectilePool *pool, const Room *room, float dt);
 
-void projectile_render_all(const ProjectilePool *pool, SDL_Renderer *renderer, float alpha);
+void projectile_render_all(const ProjectilePool *pool, SDL_Renderer *renderer, float alpha, Camera cam);
 
 int projectile_count(const ProjectilePool *pool);
 

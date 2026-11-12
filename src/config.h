@@ -58,6 +58,16 @@ typedef struct Tuning {
     float enemy_hurt_flash;    /* durée du clignotement quand un ennemi est touché, s */
     float enemy_spawn_min_dist;/* distance minimale au joueur pour apparaître, px */
 
+    /* Étage (GDD §12) */
+    int   floor_min_rooms;
+    int   floor_max_rooms;
+    float floor_big_room_chance;      /* probabilité de tenter une grande salle */
+    int   floor_min_big_rooms;        /* au moins tant de grandes salles par étage */
+    int   room_max_babies;            /* salle normale : 0 à N bébés ... */
+    int   room_babies_per_extra_cell; /* ... + tant par cellule supplémentaire */
+    int   boss_room_babies;
+    float room_transition_time;       /* glissement d'une salle à l'autre, s */
+
     /* Barre de vie (soufflet de crescendo) */
     float hud_bar_base_len;    /* longueur du soufflet, px ... */
     float hud_bar_len_per_hp;  /* ... + tant de px par PV maximum */

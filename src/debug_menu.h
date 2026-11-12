@@ -14,6 +14,8 @@
 typedef enum DebugAction {
     DEBUG_ACTION_NONE,
     DEBUG_ACTION_SPAWN_BABY,
+    DEBUG_ACTION_NEW_FLOOR,
+    DEBUG_ACTION_KILL_ENEMIES,
 } DebugAction;
 
 typedef struct DebugMenu {

@@ -3,7 +3,7 @@
 Roguelike façon *The Binding of Isaac* à travers l'histoire de la musique. C11 + SDL3.
 Le design est dans [`docs/concept/GDD.md`](docs/concept/GDD.md).
 
-**État : Phase 2** — une salle, déplacement, tir de notes, un ennemi (le bébé médiéval), vie et dégâts (placeholders).
+**État : Phase 3** — étage généré au hasard (salles de toutes formes, portes, mini-carte), le bébé médiéval, vie et dégâts (placeholders).
 
 ## Compiler et lancer
 
@@ -30,8 +30,8 @@ cmake --build build-web -j
 |---|---|
 | ZQSD (AZERTY) / WASD (QWERTY) | Se déplacer (touches lues par position physique) |
 | Flèches | Chanter (tirer) — la dernière flèche enfoncée l'emporte |
-| F1 | Infos de debug (FPS) |
-| F2 | Menu de debug : attributs du joueur modifiables à la souris (− / +, maintenir pour répéter), ajouter un bébé |
+| F1 | Infos de debug (FPS, graine de l'étage, salle actuelle) |
+| F2 | Menu de debug : attributs du joueur modifiables à la souris (− / +, maintenir pour répéter), ajouter un bébé, nouvel étage, tuer les ennemis |
 | F11 | Plein écran |
 | Échap | Quitter |
 

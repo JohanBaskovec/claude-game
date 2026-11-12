@@ -3,7 +3,7 @@
 > Document de travail destiné à Claude Code. Il décrit l'univers et les choix de design.
 > **Statut : en cours de conception.** Les sections marquées ✅ sont décidées, 💡 sont des idées à valider, ❓ sont des questions ouvertes.
 > **Source de vérité du design : ce fichier, dans le dépôt** (`docs/concept/GDD.md`). La conception se fait désormais uniquement avec Claude Code, qui le met à jour au fil des décisions prises avec Johan.
-> **Phase en cours : Phase 2 (section 11).** La Phase 1 (section 10) est terminée. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
+> **Phase en cours : Phase 3 (section 12).** Les Phases 1 et 2 (sections 10 et 11) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
 
 ---
 
@@ -328,7 +328,7 @@ Ennemis, objets, salles multiples, dégâts et mort (les PV existent mais rien n
 
 ---
 
-## 11. PHASE 2 — Premier ennemi, vie et dégâts (en cours)
+## 11. PHASE 2 — Premier ennemi, vie et dégâts ✅ (terminée)
 
 **But** : valider la boucle de combat de base : esquiver, tirer, prendre des coups.
 
@@ -343,4 +343,52 @@ Ennemis, objets, salles multiples, dégâts et mort (les PV existent mais rien n
 
 ### Hors périmètre (ne pas faire)
 Autres ennemis, objets, salles multiples, écran de mort, sons, graphismes finaux, menus du jeu.
+
+---
+
+## 12. PHASE 3 — Un étage (en cours)
+
+**But** : parcourir un étage généré au hasard, de salle en salle, y compris dans de grandes salles plus larges que l'écran.
+
+### Génération de l'étage ✅
+- Sur la grille de la double page : **7 colonnes × 10 lignes** de cellules (section 9).
+- **10 à 12 salles** au premier étage, comme TBOI.
+- **Formes de salles dès cette phase** : 1×1, 2×1, 1×2, 2×2 et en L (4 orientations). Au moins une grande salle par étage pour l'instant, pour tester.
+- **Salle de départ au centre de la grille** : colonne 3, ligne 4, donc sur la reliure.
+- Algorithme façon TBOI : on part de la salle de départ et on ajoute des salles voisines au hasard. Une nouvelle salle ne doit toucher qu'**une seule** salle existante, ce qui évite les boucles et donne des branches et des culs-de-sac. Si le résultat ne convient pas, on recommence.
+- **Graine** : un étage est entièrement déterminé par sa graine (même graine = même étage).
+- **Portes** : une porte entre deux salles voisines, au milieu de chaque côté de cellule partagé. Une grande salle peut donc avoir plusieurs portes sur un même mur.
+
+### Salles spéciales ✅
+- **Départ** : vide.
+- **Salle du boss** : le cul-de-sac le plus éloigné du départ. Pas encore de vrai boss : elle contient plus de bébés (6, provisoire).
+- **Salles normales** : 0 à 4 bébés au hasard, plus 2 par cellule supplémentaire pour les grandes salles (provisoire).
+- Trésor, boutique, Tartini, Hildegard… : plus tard.
+
+### Portes sans serrure ✅
+- Les portes se **ferment** quand on entre dans une salle qui contient des ennemis, et s'**ouvrent** quand elle est vidée.
+- Une salle vidée le reste : on la retraverse librement.
+- Les portes à serrure (clés de sol, de fa, d'ut) viendront plus tard.
+
+### Grandes salles et caméra ✅
+- Comme dans TBOI, une grande salle **ne tient pas entière à l'écran** : la caméra suit le joueur et s'arrête aux murs de la salle.
+- Une salle 1×1 remplit exactement l'écran : la caméra y est fixe.
+
+### Passage d'une salle à l'autre ✅
+- En franchissant une porte ouverte, l'écran **glisse** vers la salle voisine (≈ 0,3 s), comme dans TBOI. Le jeu est en pause pendant le glissement.
+- Le joueur arrive juste devant la porte correspondante de la nouvelle salle.
+
+### Mini-carte ✅
+- En haut à droite : la double page en miniature, reliure comprise.
+- Salles **visitées** éclairées, salle **actuelle** en rose, salles **découvertes** (voisines d'une salle visitée) en sombre, les autres invisibles. La salle du boss est marquée dès qu'elle est découverte.
+
+### Mort ✅
+- À 0 PV, on recommence sur un **nouvel étage** (nouvelle graine). Les attributs réglés dans le menu de debug sont conservés.
+
+### Debug
+- **F1** affiche la graine et la salle actuelle.
+- **F2** : boutons « Nouvel étage » et « Tuer les ennemis ».
+
+### Hors périmètre (ne pas faire)
+Sol en double page (texte latin, reliure), portes à serrure, salles spéciales autres que le boss, vrai boss, passage à l'étage suivant, objets, sons, graphismes finaux.
 
