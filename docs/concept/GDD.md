@@ -3,7 +3,7 @@
 > Document de travail destiné à Claude Code. Il décrit l'univers et les choix de design.
 > **Statut : en cours de conception.** Les sections marquées ✅ sont décidées, 💡 sont des idées à valider, ❓ sont des questions ouvertes.
 > **Source de vérité du design : ce fichier, dans le dépôt** (`docs/concept/GDD.md`). La conception se fait désormais uniquement avec Claude Code, qui le met à jour au fil des décisions prises avec Johan.
-> **Phase en cours : Phase 9 (section 18).** Les Phases 7 et 8 (sections 16 et 17) sont implémentées, à valider. Les Phases 1 à 6 (sections 10 à 15) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
+> **Phase en cours : Phase 10 (section 19).** Les Phases 1 à 9 (sections 10 à 18) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
 
 ---
 
@@ -605,7 +605,7 @@ Les autres neumes et objets de polyphonie, les armes des autres époques, l'appa
 ### Hors périmètre (ne pas faire)
 Le Gros Bébé, les objets, les armes, les prix, les meubles (lutrins, coffre, trappe), les tirs et l'interface (phase ultérieure) ; les animations au-delà de la marche et du chant ; les autres époques.
 
-## 16. PHASE 7 — Ennemis du premier étage (implémentée, à valider)
+## 16. PHASE 7 — Ennemis du premier étage ✅ (terminée)
 
 **But** : peupler le Haut Moyen Âge avec quatre nouveaux ennemis, dont trois qui tirent. Il faut donc des **tirs ennemis** et de l'**encre toxique** au sol.
 
@@ -655,7 +655,7 @@ Le Gros Bébé, les objets, les armes, les prix, les meubles (lutrins, coffre, t
 ### Hors périmètre (ne pas faire)
 Les autres ennemis du §8 (blemmyes, cynocéphales, sciapodes, chapiteaux…), les nouveaux boss, les sons, les tirs ennemis détruits par les notes.
 
-## 17. PHASE 8 — Visée libre à la souris (implémentée, à valider)
+## 17. PHASE 8 — Visée libre à la souris ✅ (terminée)
 
 **But** : pouvoir viser dans n'importe quelle direction, pas seulement les 4 des flèches.
 
@@ -674,7 +674,7 @@ Les autres ennemis du §8 (blemmyes, cynocéphales, sciapodes, chapiteaux…), l
 - **Manette** (joystick droit pour viser) : plus tard, elle utilisera la même visée libre.
 - Viser au clavier en diagonale.
 
-## 18. PHASE 9 — Les ennemis explosent
+## 18. PHASE 9 — Les ennemis explosent ✅ (terminée)
 
 **But** : rendre les morts plus satisfaisantes, dans le ton d'humour noir du jeu.
 
@@ -689,3 +689,23 @@ Les autres ennemis du §8 (blemmyes, cynocéphales, sciapodes, chapiteaux…), l
 
 ### Hors périmètre (ne pas faire)
 Les taches qui restent quand on revient dans une salle, les morceaux d'ennemis (os, auréoles, plumes), les sons.
+
+## 19. PHASE 10 — Sons : le chant d'Amadeus
+
+**But** : les premiers sons, en commençant par le tir. Tout est synthétisé par le jeu (aucun fichier audio), comme le décor.
+
+### Son du tir : Amadeus chante *Ut queant laxis* ✅
+- À chaque tir, Amadeus **chante la syllabe suivante de l'hymne *Ut queant laxis*** (Paul Diacre, VIIIe s., Liber Usualis 1961 p. 1504, domaine public), celui dont Guido d'Arezzo a tiré les noms des notes ut, ré, mi, fa, sol, la. Son texte est déjà écrit sur le sol.
+- Chaque syllabe a ses vraies notes : une seule note, ou un petit groupe (neume) chanté d'un trait. Il chante la **vraie voyelle** de la syllabe (« Ut » sur u, « la » sur a…).
+- La mélodie continue d'un tir à l'autre et recommence au début quand la strophe est finie (38 syllabes).
+- Voix d'enfant (une octave au-dessus de la notation), un peu synthétique : ça va avec le pixel art.
+- Toutes les armes chantent pour l'instant ; les sons propres aux instruments viendront plus tard.
+
+### Technique ✅
+- Module `audio.c` : un flux SDL (`SDL_OpenAudioDeviceStream`), rempli à chaque image depuis la boucle principale (pas de thread à nous). Quelques voix mixées, sons calculés une fois au démarrage.
+- Synthèse vocale par formants : harmoniques de la note, dont le volume suit les résonances de la voyelle ; vibrato léger ; petit souffle sur les consonnes (s, t, x…).
+- Sans carte son (ou si l'audio ne s'ouvre pas), le jeu tourne en silence.
+- Volume réglable dans `tuning`.
+
+### Hors périmètre (ne pas faire)
+Les autres sons (dégâts, morts, métronome, ennemis, interface), les sons des instruments, la musique, le réglage du volume dans un menu.

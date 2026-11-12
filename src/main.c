@@ -9,6 +9,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
+#include "audio.h"
 #include "config.h"
 #include "debug_menu.h"
 #include "draw.h"
@@ -136,6 +137,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_srand(0);   /* graine aléatoire tirée de l'horloge */
     text_init_from_locale();
     decor_init();
+    audio_init();
     game_init(&app->game, random_seed());
     debug_menu_init(&app->debug);
 
@@ -218,6 +220,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
         app->accumulator_ns -= TICK_NS;
     }
     float alpha = (float)app->accumulator_ns / (float)TICK_NS;
+    audio_update();
 
     /* Mini-carte : toute la carte quand le menu de debug est ouvert, salle survolée par la souris. */
     float mx, my, lx, ly;
@@ -241,6 +244,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
 {
     (void)result;
     App *app = appstate;
+    audio_quit();
     decor_quit();
     sprite_quit();
     if (app) {

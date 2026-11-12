@@ -39,6 +39,7 @@ endif()
 # --- Jeu ----------------------------------------------------------------
 add_executable(fugue
     src/main.c
+    src/audio.c
     src/bomb.c
     src/bullet.c
     src/config.c

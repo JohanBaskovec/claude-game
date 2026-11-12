@@ -259,6 +259,9 @@ typedef struct Tuning {
     float splat_gravity;              /* px/s² */
     float splat_boss_scale;           /* le Gros Bébé explose tant de fois plus fort */
 
+    /* Sons (GDD §19) */
+    float sound_volume;               /* volume général, 0..1 */
+
     /* Barre de vie (soufflet de crescendo) */
     float hud_bar_base_len;    /* longueur du soufflet, px ... */
     float hud_bar_len_per_hp;  /* ... + tant de px par PV maximum */

@@ -3,7 +3,7 @@
 Roguelike façon *The Binding of Isaac* à travers l'histoire de la musique. C11 + SDL3.
 Le design est dans [`docs/concept/GDD.md`](docs/concept/GDD.md).
 
-**État : Phase 7** — une vraie partie (étages, prix, métronomes-bombes, salle du trésor, Gros Bébé, trappe), les armes du Haut Moyen Âge (voix, olifant, flûte, lyre, tabourin, cloche, orgue) avec les premiers neumes, et les vrais graphismes du décor (château, portes, sol en manuscrit à neumes sur une double page avec sa reliure), d'Amadeus et du bébé médiéval, et les ennemis du premier étage : moine chanteur, plume géante qui crache de l'encre toxique, ver de livre qui surgit du sol, sonneur de cloche (sprites provisoires), qui explosent en laissant des taches de sang ou d'encre. Visée libre à la souris. Les autres graphismes sont encore provisoires.
+**État : Phase 7** — une vraie partie (étages, prix, métronomes-bombes, salle du trésor, Gros Bébé, trappe), les armes du Haut Moyen Âge (voix, olifant, flûte, lyre, tabourin, cloche, orgue) avec les premiers neumes, et les vrais graphismes du décor (château, portes, sol en manuscrit à neumes sur une double page avec sa reliure), d'Amadeus et du bébé médiéval, et les ennemis du premier étage : moine chanteur, plume géante qui crache de l'encre toxique, ver de livre qui surgit du sol, sonneur de cloche (sprites provisoires), qui explosent en laissant des taches de sang ou d'encre. Visée libre à la souris. Premier son : à chaque tir, Amadeus chante la syllabe suivante de l'hymne *Ut queant laxis* (voix synthétisée par le jeu). Les autres graphismes sont encore provisoires.
 
 ## Compiler et lancer
 
@@ -58,3 +58,4 @@ Les valeurs de départ et tous les autres paramètres sont dans [`src/config.c`]
 
 - [Junicode](https://github.com/psb1558/Junicode-font) de Peter S. Baker (`assets/fonts/`) : SIL Open Font License 1.1, voir `assets/fonts/OFL.txt`.
 - [stb_truetype](https://github.com/nothings/stb) de Sean Barrett (`src/third_party/`) : domaine public.
+- Mélodie d'*Ut queant laxis* (hymne du VIIIe siècle, *Liber Usualis* 1961 p. 1504) : domaine public ; notes relevées sur [GregoBase](https://gregobase.selapa.net/chant.php?id=2539).

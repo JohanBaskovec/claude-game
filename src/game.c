@@ -1,4 +1,5 @@
 #include "game.h"
+#include "audio.h"
 #include "config.h"
 #include "decor.h"
 #include "minimap.h"
@@ -265,6 +266,7 @@ static void fire(Game *g, PlayerFire f)
         return;
     }
 
+    audio_sing();   /* Amadeus chante la syllabe suivante d'Ut queant laxis */
     float dx = f.dx, dy = f.dy, cx, cy;
     player_center(p, &cx, &cy);
     ShotSpec s = weapon_shot(&p->stats, g->owned, f.charge);

@@ -178,6 +178,8 @@ Tuning tuning = {
     .splat_gravity      = 800.0f,
     .splat_boss_scale   = 2.6f,
 
+    .sound_volume = 0.5f,
+
     .hud_bar_base_len   = 120.0f,
     .hud_bar_len_per_hp = 2.5f,
     .hud_bar_drain_time = 0.30f,
