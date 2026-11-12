@@ -140,6 +140,9 @@ static void baby_update(Enemy *e, const Room *room, float target_x, float target
     if (len > 1.0f && e->stun_timer <= 0.0f) {
         tx = dx / len * speed;
         ty = dy / len * speed;
+        /* Un peu de marge : il ne se retourne pas sans cesse quand le joueur est juste au-dessus ou en dessous. */
+        if (dx < -4.0f) e->face_left = true;
+        else if (dx > 4.0f) e->face_left = false;
     }
     move(e, room, tx, ty, tuning.baby_accel_time, dt);
 }
@@ -313,7 +316,7 @@ static void baby_render(const Enemy *e, SDL_Renderer *r, float alpha, Camera cam
     int step = (int)(e->anim_time / SDL_max(tuning.baby_walk_frame, 0.01f)) % steps;
     SpriteId id = PINGPONG[step];
     float top = feet - (float)(sprite_bottom(id) + 1);
-    sprite_draw(r, id, cx - (float)(sprite_width(id) / 2), top, e->vx < 0.0f, e->hurt_timer > 0.0f);
+    sprite_draw(r, id, cx - (float)(sprite_width(id) / 2), top, e->face_left, e->hurt_timer > 0.0f);
 }
 
 /* Le Gros Bébé est dessiné dans un repère (cx, feet) étiré par (sx, sy) :

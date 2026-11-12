@@ -29,6 +29,7 @@ typedef struct Enemy {
     float     hp;             /* flottant : les dégâts des notes peuvent être fractionnaires */
     float     hurt_timer;     /* > 0 : clignote après une touche */
     float     anim_time;      /* pour le dandinement */
+    bool      face_left;      /* regarde où il veut aller (pas où une poussée l'envoie) */
     float     max_hp;
     float     stun_timer;     /* > 0 : étourdi, ne bouge plus */
     float     slow_timer;     /* > 0 : ralenti (encre) */
