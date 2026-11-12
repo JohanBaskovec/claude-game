@@ -346,7 +346,7 @@ On découpe par **époques** plutôt que par siècles, car entre le IXe et le XI
   - cadence de tir limitée (variable `fireRate`) ;
   - les projectiles ont une vitesse et une portée, puis disparaissent ;
   - ils disparaissent aussi en touchant un mur ;
-  - 💡 bonus si simple : le projectile hérite d'une partie de la vitesse du joueur, comme dans TBOI.
+  - ✅ Les notes **n'héritent pas** de la vitesse d'Amadeus : elles partent toujours droit vers où il vise, même en courant (`tuning.shot_inherit` = 0 ; le réglage reste si on veut y revenir).
 - **Paramètres regroupés dans un seul endroit** pour être faciles à ajuster : vitesse du joueur, cadence, vitesse des projectiles, portée.
 - ✅ **Attributs du joueur** (section 4) : points de vie, vitesse de déplacement, cadence de tir, vitesse des tirs, portée des tirs. Les valeurs de départ viennent des paramètres ; le joueur garde ses valeurs courantes, que les objets modifieront plus tard.
 - ✅ **Outils de debug** (non traduits, réservés au développement) :

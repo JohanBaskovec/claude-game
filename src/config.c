@@ -25,7 +25,7 @@ Tuning tuning = {
 
     .shot_size     = 10.0f,
     .shot_height   = 34.0f,
-    .shot_inherit  = 0.5f,
+    .shot_inherit  = 0.0f,
     .sing_duration = 0.12f,
     .shot_knockback = 170.0f,
 
