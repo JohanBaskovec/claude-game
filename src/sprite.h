@@ -42,12 +42,21 @@ typedef enum SpriteId {
     SPR_KEY_SOL, SPR_KEY_FA, SPR_KEY_UT,
     SPR_BOX_GRAY, SPR_BOX_GRAY_OPEN, SPR_BOX_GOLD, SPR_BOX_GOLD_OPEN,
     SPR_KEY_SOL_SMALL, SPR_KEY_FA_SMALL, SPR_KEY_UT_SMALL,   /* pour le HUD */
+    /* Notes d'Amadeus de la phase 15, dans l'ordre NoteValue (ronde ... quadruple croche) :
+     * case 32x48, centre de la tête en (SPR_NOTE_HEAD_X, SPR_NOTE_HEAD_Y). Planche PNG seulement. */
+    SPR_NOTE_WHOLE, SPR_NOTE_HALF, SPR_NOTE_QUARTER, SPR_NOTE_EIGHTH, SPR_NOTE_16TH, SPR_NOTE_32ND, SPR_NOTE_64TH,
     SPR_COUNT
 } SpriteId;
 
 /* Décalage vertical entre la ligne 0 d'une tête d'Amadeus et la ligne 0 de son corps
  * (planches : le bas de la case de la tête recouvre les 8 premières lignes du corps). */
 int sprite_ama_head_above_body(void);
+
+#define SPR_NOTE_HEAD_X 12
+#define SPR_NOTE_HEAD_Y 38
+
+/* Vrai si l'image du sprite est disponible (planche chargée ou grille de secours). */
+bool sprite_available(SpriteId id);
 
 int sprite_width(SpriteId id);
 int sprite_height(SpriteId id);
@@ -57,6 +66,9 @@ int sprite_bottom(SpriteId id);
 
 /* Dessine le sprite, coin haut-gauche en (x, y) écran. flip : miroir horizontal ; white : tout blanc. */
 void sprite_draw(SDL_Renderer *renderer, SpriteId id, float x, float y, bool flip, bool white);
+
+/* Pareil, agrandi `scale` fois (coin haut-gauche en (x, y)). */
+void sprite_draw_scaled(SDL_Renderer *renderer, SpriteId id, float x, float y, float scale, bool flip, bool white);
 
 void sprite_quit(void);
 

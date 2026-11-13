@@ -44,6 +44,7 @@ Enemy *enemy_spawn(EnemyPool *pool, EnemyType type, float x, float y)
         *e = (Enemy){ 0 };
         e->active = true;
         e->type = type;
+        e->chant = -1;   /* moine : son chant est choisi à sa première note */
         type_stats(type, &e->hp, &e->box.w, &e->box.h);
         e->max_hp = e->hp;
         e->box.x = x - e->box.w * 0.5f;

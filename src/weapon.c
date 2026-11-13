@@ -32,6 +32,19 @@ float weapon_fire_rate(const PlayerStats *st)
     return SDL_max(st->fire_rate * def(st->weapon)->fire_rate_mul, 0.01f);
 }
 
+float weapon_shot_interval(const PlayerStats *st)
+{
+    return 1.0f / weapon_fire_rate(st);
+}
+
+NoteValue weapon_note_value(const PlayerStats *st)
+{
+    /* ronde = 4 noires ... quadruple croche = 1/16 de noire : on prend la plus proche (échelle log) */
+    float octaves = log2f(weapon_shot_interval(st) / SDL_max(tuning.note_quarter_time, 0.001f));
+    int v = NOTE_QUARTER - (int)SDL_roundf(octaves);
+    return (NoteValue)SDL_clamp(v, NOTE_WHOLE, NOTE_64TH);
+}
+
 float weapon_charge_time(const PlayerStats *st)
 {
     if (!def(st->weapon)->charge) return 0.0f;

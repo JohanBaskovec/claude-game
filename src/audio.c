@@ -1,14 +1,18 @@
 #include "audio.h"
 #include "chant_data.h"
+#include "song_data.h"
 #include "config.h"
 
 #include <math.h>
 
 /*
  * Tous les sons sont calculés par le jeu, sans fichier audio.
- * - Chant d'Amadeus (GDD §19) : chants grégoriens de chant_data.h (relevés sur GregoBase
- *   depuis le Liber Usualis 1961) ; chaque tir chante la syllabe suivante, calculée au
- *   moment du tir. Après une pause, ou à la fin d'un chant, on passe à un autre.
+ * - Chant d'Amadeus (GDD §26) : chansons pop originales de song_data.h ; chaque tir chante
+ *   la syllabe suivante, calculée au moment du tir, et qui dure le temps entre deux tirs
+ *   moins un petit silence (GDD §24). Quand on arrête de tirer, ou à la fin d'une chanson,
+ *   on passe à une autre.
+ * - Moines (GDD §25) : chants grégoriens de chant_data.h (relevés sur GregoBase depuis le
+ *   Liber Usualis 1961), d'une voix d'homme.
  * - Bruitages (GDD §20) : calculés une fois à l'ouverture, rejoués à la hauteur voulue.
  */
 
@@ -24,12 +28,18 @@ static const Vowel VOWELS[5] = {   /* voix d'enfant */
     /* o */ { { 520.0f, 950.0f, 2900.0f },  { 110.0f, 130.0f, 200.0f }, { 1.0f, 0.70f, 0.15f } },
     /* u */ { { 360.0f, 820.0f, 2700.0f },  { 100.0f, 120.0f, 200.0f }, { 1.0f, 0.50f, 0.10f } },
 };
-/* Le moine : « o » d'une voix d'homme, sombre. */
-static const Vowel MONK_VOWEL = { { 450.0f, 800.0f, 2600.0f }, { 80.0f, 90.0f, 160.0f }, { 1.0f, 0.55f, 0.12f } };
-#define MONK_HZ 146.83f   /* ré3 */
+/* Les moines (GDD §25) : voix d'homme, sombre, deux octaves sous Amadeus. */
+static const Vowel MONK_VOWELS[5] = {
+    /* a */ { { 700.0f, 1100.0f, 2450.0f }, { 80.0f, 90.0f, 140.0f }, { 1.0f, 0.55f, 0.12f } },
+    /* e */ { { 480.0f, 1750.0f, 2450.0f }, { 70.0f, 100.0f, 140.0f }, { 1.0f, 0.35f, 0.15f } },
+    /* i */ { { 290.0f, 2200.0f, 2950.0f }, { 60.0f, 110.0f, 150.0f }, { 1.0f, 0.25f, 0.15f } },
+    /* o */ { { 470.0f, 780.0f, 2500.0f },  { 70.0f, 80.0f, 140.0f },  { 1.0f, 0.60f, 0.08f } },
+    /* u */ { { 320.0f, 720.0f, 2300.0f },  { 60.0f, 80.0f, 140.0f },  { 1.0f, 0.45f, 0.06f } },
+};
+#define MONK_PITCH 0.25f   /* deux octaves sous la voix d'Amadeus */
 
-#define MAX_SYL_SECONDS 0.45f
-#define MAX_SYL_SAMPLES (AUDIO_RATE * 45 / 100)
+#define MAX_SYL_SECONDS 3.0f   /* une ronde à la cadence la plus lente */
+#define MAX_SYL_SAMPLES (AUDIO_RATE * 3)
 #define MAX_VOICES      16
 #define MAX_HARMONICS   64
 #define MIX_CHUNK       256
@@ -48,7 +58,7 @@ typedef struct Voice {
 static SDL_AudioStream *stream;
 static Voice            voices[MAX_VOICES];
 static Sint16           chant_buf[MAX_VOICES][MAX_SYL_SAMPLES];   /* syllabe calculée pour chaque voix */
-static int              chant;            /* chant en cours */
+static int              song;             /* chanson d'Amadeus en cours */
 static int              next_syllable;    /* syllabe chantée au prochain tir */
 static float            last_sing = -1e9f;
 static Uint64           rng = 0x9E3779B97F4A7C15ull;
@@ -75,25 +85,35 @@ static int vowel_index(char v)
 }
 
 /* Plus grand écart (en demi-tons) entre la note la plus grave et la plus aiguë du chant. */
-static int ambitus(int c)
+static int ambitus(const Chant *ch)
 {
     int hi = 0;
-    for (int i = 0; i < CHANTS[c].count; i++) {
-        for (const char *n = CHANTS[c].syllables[i].notes; *n; n++) hi = SDL_max(hi, *n - 'a');
+    for (int i = 0; i < ch->count; i++) {
+        for (const char *n = ch->syllables[i].notes; *n; n++) hi = SDL_max(hi, *n - 'a');
     }
     return hi;
 }
 
-float audio_syllable_pitch(int c, int i, int note)
+/* Hauteur d'une note (Hz) : le milieu de l'ambitus du chant est placé vers fa5. */
+static float pitch_of(const Chant *ch, int i, int note)
 {
-    if (c < 0 || c >= CHANT_COUNT || i < 0 || i >= CHANTS[c].count) return 0.0f;
-    const char *notes = CHANTS[c].syllables[i].notes;
+    if (i < 0 || i >= ch->count) return 0.0f;
+    const char *notes = ch->syllables[i].notes;
     if (note < 0 || note >= (int)SDL_strlen(notes)) return 0.0f;
-    float semis = (float)(notes[note] - 'a') - (float)ambitus(c) * 0.5f;
+    float semis = (float)(notes[note] - 'a') - (float)ambitus(ch) * 0.5f;
     return MIDDLE_HZ * powf(2.0f, semis / 12.0f);
 }
 
-/* Gain de la voyelle à la fréquence f : somme de résonances. */
+float audio_syllable_pitch(int c, int i, int note)
+{
+    return (c >= 0 && c < CHANT_COUNT) ? pitch_of(&CHANTS[c], i, note) : 0.0f;
+}
+
+float audio_song_pitch(int c, int i, int note)
+{
+    return (c >= 0 && c < SONG_COUNT) ? pitch_of(&SONGS[c], i, note) : 0.0f;
+}
+
 static float vowel_gain(const Vowel *v, float f)
 {
     float g = 0.0f;
@@ -148,33 +168,59 @@ static float synth_voice(const float *pitch, int notes, const Vowel *v, float vi
             s_cur = s_next;
         }
         /* Consonne : petit souffle aigu au début. */
-        if (fricative && t < 0.03f) {
+        if (fricative && t < 0.03f && t < dur * 0.3f) {
             float w = noise(), hp = w - prev_noise;
             prev_noise = w;
             x += hp * 0.35f * (1.0f - t / 0.03f);
         }
-        float env = SDL_min(t / 0.012f, 1.0f) * SDL_min((dur - t) / 0.06f, 1.0f) * (1.0f - 0.25f * t / dur);
+        /* attaque et fin raccourcies pour les syllabes très brèves (quadruples croches) */
+        float att = SDL_min(0.012f, dur * 0.25f), rel = SDL_min(0.06f, dur * 0.3f);
+        float env = SDL_min(t / att, 1.0f) * SDL_min((dur - t) / rel, 1.0f) * (1.0f - 0.25f * t / dur);
         out[k] = x * SDL_max(env, 0.0f);
         peak = SDL_max(peak, fabsf(out[k]));
     }
     return peak;
 }
 
-int audio_render_syllable(int c, int i, Sint16 *out, int max)
+/* Une syllabe chantée par Amadeus (enfant) ou par un moine (homme, deux octaves plus bas). */
+static int render_syllable(const Chant *ch, int i, float dur, bool monk, Sint16 *out, int max)
 {
     static float buf[MAX_SYL_SAMPLES];
-    if (c < 0 || c >= CHANT_COUNT || i < 0 || i >= CHANTS[c].count) return 0;
-    const ChantSyllable *s = &CHANTS[c].syllables[i];
+    if (i < 0 || i >= ch->count) return 0;
+    const ChantSyllable *s = &ch->syllables[i];
     int notes = SDL_min((int)SDL_strlen(s->notes), 16);
     float pitch[16];
-    for (int k = 0; k < notes; k++) pitch[k] = audio_syllable_pitch(c, i, k);
-    float dur = SDL_min(0.19f + 0.06f * (float)(notes - 1), MAX_SYL_SECONDS);
+    for (int k = 0; k < notes; k++) pitch[k] = pitch_of(ch, i, k) * (monk ? MONK_PITCH : 1.0f);
+    dur = SDL_clamp(dur, 0.004f, MAX_SYL_SECONDS);
     int n = SDL_min(SDL_min((int)(dur * AUDIO_RATE), MAX_SYL_SAMPLES), max);
     char first = (char)(s->text[0] | 0x20);
     bool fricative = first == 's' || first == 'x' || first == 't' || first == 'c' || first == 'f';
-    float peak = synth_voice(pitch, notes, &VOWELS[vowel_index(s->vowel)], 0.008f, fricative, buf, n);
+    const Vowel *v = monk ? &MONK_VOWELS[vowel_index(s->vowel)] : &VOWELS[vowel_index(s->vowel)];
+    float peak = synth_voice(pitch, notes, v, monk ? 0.005f : 0.008f, fricative, buf, n);
     for (int k = 0; k < n; k++) out[k] = (Sint16)(buf[k] / peak * 0.85f * 32767.0f);
     return n;
+}
+
+int audio_render_song_syllable(int c, int i, float dur, Sint16 *out, int max)
+{
+    return (c >= 0 && c < SONG_COUNT) ? render_syllable(&SONGS[c], i, dur, false, out, max) : 0;
+}
+
+int audio_render_monk_syllable(int c, int i, float dur, Sint16 *out, int max)
+{
+    return (c >= 0 && c < CHANT_COUNT) ? render_syllable(&CHANTS[c], i, dur, true, out, max) : 0;
+}
+
+const char *audio_syllable_text(int c, int i)
+{
+    if (c < 0 || c >= CHANT_COUNT || i < 0 || i >= CHANTS[c].count) return "";
+    return CHANTS[c].syllables[i].text;
+}
+
+const char *audio_syllable_notes(int c, int i)
+{
+    if (c < 0 || c >= CHANT_COUNT || i < 0 || i >= CHANTS[c].count) return "";
+    return CHANTS[c].syllables[i].notes;
 }
 
 /* --- Bruitages ------------------------------------------------------------------- */
@@ -370,15 +416,6 @@ static void make_ink_spit(void)
     store_sound(SOUND_INK_SPIT, dur);
 }
 
-/* Le moine chante une note grave, toujours la même (la variation vient de audio_play). */
-static void make_monk_note(void)
-{
-    sfx_begin(61);
-    const float dur = 0.44f, pitch = MONK_HZ;
-    synth_voice(&pitch, 1, &MONK_VOWEL, 0.004f, false, sfx, (int)(dur * AUDIO_RATE));
-    store_sound(SOUND_MONK_NOTE, dur);
-}
-
 /* Cloche du sonneur : partiels d'une cloche d'église (bourdon, fondamentale, tierce mineure...). */
 static void make_bell(void)
 {
@@ -480,6 +517,62 @@ static void add_gasp(float start, float dur, float amp)
     }
 }
 
+/*
+ * Cri d'Amadeus touché : « aïe ! » d'enfant. Attaque brusque (coup de glotte), la voix monte
+ * d'un coup puis retombe en glissant de « a » vers « i », tendue et un peu éraillée.
+ */
+static void add_ouch(float start, float dur, float f_peak, float amp)
+{
+    const Vowel *A = &VOWELS[0], *I = &VOWELS[2];
+    int k0 = (int)(start * AUDIO_RATE), n = (int)(dur * AUDIO_RATE);
+    float phase = 0.0f, half = 0.0f, prev_noise = 0.0f, amps[MAX_HARMONICS];
+    int harmonics = 0;
+    for (int k = 0; k < n && k0 + k < MAX_SOUND_SAMPLES; k++) {
+        float t = (float)k / AUDIO_RATE, u = t / dur;
+        /* hauteur : jaillit vers le haut, puis retombe d'une quinte */
+        float c = u < 0.12f ? 0.85f + 0.15f * (u / 0.12f) : 1.0f - 0.38f * powf((u - 0.12f) / 0.88f, 1.4f);
+        float f0 = f_peak * c * (1.0f + 0.01f * sinf(2.0f * SDL_PI_F * 9.0f * t));
+        if (k % 32 == 0) {
+            float w = SDL_clamp((u - 0.30f) / 0.45f, 0.0f, 1.0f);   /* « a » puis « i » */
+            Vowel v;
+            for (int i = 0; i < 3; i++) {
+                v.f[i] = A->f[i] + (I->f[i] - A->f[i]) * w;
+                v.bw[i] = A->bw[i] + (I->bw[i] - A->bw[i]) * w;
+                v.amp[i] = A->amp[i] + (I->amp[i] - A->amp[i]) * w;
+            }
+            harmonics = 0;
+            for (int h = 1; h <= MAX_HARMONICS && (float)h * f0 < AUDIO_RATE * 0.5f - 600.0f; h++) {
+                amps[harmonics++] = vowel_gain(&v, (float)h * f0) / powf((float)h, 0.65f);   /* voix tendue */
+            }
+        }
+        phase += f0 / AUDIO_RATE;
+        phase -= floorf(phase);
+        half += f0 * 0.5f / AUDIO_RATE;
+        half -= floorf(half);
+        float th = 2.0f * SDL_PI_F * phase, c1 = 2.0f * cosf(th);
+        float s_prev = 0.0f, s_cur = sinf(th), x = 0.0f;
+        for (int h = 0; h < harmonics; h++) {
+            x += amps[h] * s_cur;
+            float s_next = c1 * s_cur - s_prev;
+            s_prev = s_cur;
+            s_cur = s_next;
+        }
+        x *= 0.85f + 0.15f * sinf(2.0f * SDL_PI_F * half);   /* éraillé */
+        float w = sfx_rand() * 2.0f - 1.0f;
+        x += (w - prev_noise) * (t < 0.025f ? 0.5f : 0.05f); /* coup de glotte, puis souffle */
+        prev_noise = w;
+        float env = SDL_min(t / 0.008f, 1.0f) * SDL_min((dur - t) / (0.35f * dur), 1.0f);
+        sfx[k0 + k] += amp * env * x;
+    }
+}
+
+static void make_ouch(void)
+{
+    sfx_begin(131);
+    add_ouch(0.0f, 0.34f, 820.0f, 1.0f);
+    store_sound(SOUND_HURT, 0.36f);
+}
+
 /* Pleurs de bébé : un long « ouiiin », ou un sanglot « oua… ouaaah ». */
 /* Une lame de boîte à musique pincée : fondamentale qui dure, partiel aigu de lame vibrante
  * (rapport 6,27) qui s'éteint vite, une copie à peine désaccordée qui chatoie, et le petit clic du picot. */
@@ -565,13 +658,13 @@ bool audio_init(void)
     make_splat();
     make_explosion();
     make_ink_spit();
-    make_monk_note();
     make_bell();
     make_dig();
     make_baby();
     make_music_boxes();
     make_keys();
-    chant = 0;   /* on commence par Ut queant laxis, écrit sur le sol */
+    make_ouch();
+    song = 0;
     next_syllable = 0;
     last_sing = -1e9f;
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) {
@@ -637,28 +730,45 @@ static int free_voice(void)
     return best;
 }
 
-/* Un autre chant que celui en cours, au hasard. */
-static int other_chant(int current)
+/* Une autre chanson que celle en cours, au hasard. */
+static int other_song(int current)
 {
-    if (CHANT_COUNT < 2) return 0;
-    int c = SDL_rand_r(&rng, CHANT_COUNT - 1);
+    if (SONG_COUNT < 2) return 0;
+    int c = SDL_rand_r(&rng, SONG_COUNT - 1);
     return c >= current ? c + 1 : c;
 }
 
-void audio_sing(float now)
+float audio_syllable_duration(float interval)
 {
-    /* Une pause assez longue, ou la fin du chant : on en commence un autre.
-     * (now < last_sing : une nouvelle partie a remis le temps à zéro.) */
-    if (now - last_sing > tuning.chant_pause || now < last_sing || next_syllable >= CHANTS[chant].count) {
-        if (last_sing > -1e8f) chant = other_chant(chant);
+    /* toujours un silence avant le tir suivant : au moins note_gap_min, ou la moitié de
+     * l'intervalle aux cadences extrêmes (quadruples croches très serrées) */
+    float gap = SDL_min(SDL_max(tuning.note_gap_min, interval * tuning.note_gap_ratio), interval * 0.5f);
+    return SDL_clamp(interval - gap, 0.004f, MAX_SYL_SECONDS);
+}
+
+void audio_sing(float now, float interval)
+{
+    /* On a arrêté de tirer (plus d'un intervalle et demi sans tir), ou la chanson est finie :
+     * on en commence une autre. (now < last_sing : une nouvelle partie a remis le temps à zéro.) */
+    bool stopped = now - last_sing > interval * tuning.chant_stop_factor + tuning.chant_stop_margin;
+    if (stopped || now < last_sing || next_syllable >= SONGS[song].count) {
+        if (last_sing > -1e8f) song = other_song(song);
         next_syllable = 0;
     }
     last_sing = now;
     int s = next_syllable++;
     if (!stream) return;
     int v = free_voice();
-    int n = audio_render_syllable(chant, s, chant_buf[v], MAX_SYL_SAMPLES);
+    int n = render_syllable(&SONGS[song], s, audio_syllable_duration(interval), false, chant_buf[v], MAX_SYL_SAMPLES);
     voices[v] = (Voice){ chant_buf[v], n, 0.0f, 1.0f, tuning.chant_volume, -1 };
+}
+
+void audio_monk_sing(int c, int i, float duration)
+{
+    if (!stream) return;
+    int v = free_voice();
+    int n = audio_render_monk_syllable(c, i, duration, chant_buf[v], MAX_SYL_SAMPLES);
+    voices[v] = (Voice){ chant_buf[v], n, 0.0f, 1.0f, tuning.monk_voice_volume, -1 };
 }
 
 void audio_play(Sound s, float pitch)
@@ -688,9 +798,24 @@ int audio_chant_length(int c)
     return (c >= 0 && c < CHANT_COUNT) ? CHANTS[c].count : 0;
 }
 
-int audio_current_chant(void)
+int audio_song_count(void)
 {
-    return chant;
+    return SONG_COUNT;
+}
+
+const char *audio_song_name(int c)
+{
+    return (c >= 0 && c < SONG_COUNT) ? SONGS[c].name : "";
+}
+
+int audio_song_length(int c)
+{
+    return (c >= 0 && c < SONG_COUNT) ? SONGS[c].count : 0;
+}
+
+int audio_current_song(void)
+{
+    return song;
 }
 
 int audio_next_syllable(void)

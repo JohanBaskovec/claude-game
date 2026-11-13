@@ -45,7 +45,6 @@ typedef enum Sound {
     SOUND_TOCK,          /* ... et « tac » */
     SOUND_EXPLOSION,     /* le métronome explose */
     SOUND_INK_SPIT,      /* la plume crache de l'encre */
-    SOUND_MONK_NOTE,     /* le moine chante une note grave */
     SOUND_BELL,          /* le sonneur sonne sa cloche */
     SOUND_DIG,           /* le ver creuse avant de sortir */
     SOUND_BABY_CRY,      /* un bébé pleure : « ouiiinnn » */
@@ -54,6 +53,7 @@ typedef enum Sound {
     SOUND_BOX_GOLD,      /* boîte dorée : ut ré mi fa sol la */
     SOUND_KEY,           /* clef ramassée */
     SOUND_UNLOCK,        /* serrure ouverte (porte ou boîte dorée) */
+    SOUND_HURT,          /* cri d'Amadeus qui prend un dégât (« aïe ! ») */
     SOUND_COUNT
 } Sound;
 
@@ -91,6 +91,18 @@ typedef enum ShotKind {
     SHOT_RING,   /* onde circulaire autour d'Amadeus */
     SHOT_BEAM,   /* rayon instantané jusqu'au mur, traverse tout */
 } ShotKind;
+
+/* Valeur des notes tirées par Amadeus (GDD §24) : plus la cadence est rapide, plus la note est courte. */
+typedef enum NoteValue {
+    NOTE_WHOLE,     /* ronde */
+    NOTE_HALF,      /* blanche */
+    NOTE_QUARTER,   /* noire */
+    NOTE_EIGHTH,    /* croche */
+    NOTE_16TH,      /* double croche */
+    NOTE_32ND,      /* triple croche */
+    NOTE_64TH,      /* quadruple croche */
+    NOTE_VALUE_COUNT
+} NoteValue;
 
 /* Attributs d'une arme : multiplient ceux du joueur (départ + objets). */
 typedef struct WeaponTuning {
@@ -202,6 +214,7 @@ typedef struct Tuning {
     float trapdoor_radius;            /* le centre du joueur à moins de tant = on tombe, px */
 
     /* Salle du trésor et objets (effets provisoires, GDD §13) */
+    float describe_distance;          /* description affichée quand Amadeus est à moins de tant d'un objet posé, px */
     float era_title_time;             /* titre d'époque à l'arrivée au premier étage : durée totale, s */
     float era_title_fade;             /* ... fondus d'entrée et de sortie, s */
     float item_banner_time;           /* nom et effet affichés, s */
@@ -299,7 +312,13 @@ typedef struct Tuning {
 
     /* Sons (GDD §19) */
     float sound_volume;               /* volume général, 0..1 */
-    float chant_pause;                /* s sans tirer avant de changer de chant */
+    float monk_voice_volume;          /* voix des moines qui chantent (GDD §25) */
+    float chant_stop_factor;          /* plus de tant d'intervalles de tir sans tirer = arrêt : nouveau chant */
+    float chant_stop_margin;          /* ... plus cette marge, s */
+    float note_gap_min;               /* silence minimum entre deux syllabes chantées, s */
+    float note_gap_ratio;             /* ... ou cette part du temps entre deux tirs, si c'est plus long */
+    float note_quarter_time;          /* durée de la noire : la note tirée est celle dont la durée est la plus
+                                         proche du temps entre deux tirs (GDD §24), s */
     float chant_volume;               /* chant d'Amadeus (tirs), 0..1 */
     float sfx_volume;                 /* tous les bruitages, 0..1 */
     float sound_gain[SOUND_COUNT];    /* volume de chaque bruitage, 0..1 (peut dépasser 1) */

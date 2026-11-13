@@ -33,6 +33,9 @@ const char *weapon_desc(WeaponId id);
 
 /* Notes par seconde avec l'arme. */
 float weapon_fire_rate(const PlayerStats *st);
+/* Temps entre deux tirs, s, et la valeur de note qui lui correspond (la plus proche en durée). */
+float     weapon_shot_interval(const PlayerStats *st);
+NoteValue weapon_note_value(const PlayerStats *st);
 
 /* Temps d'une charge complète (flûte), 0 si l'arme ne se charge pas. */
 float weapon_charge_time(const PlayerStats *st);

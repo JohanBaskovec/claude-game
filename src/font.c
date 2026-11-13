@@ -47,6 +47,8 @@ static const struct { int file; float size; bool lining; } SPECS[FONT_COUNT] = {
     [FONT_CAP]    = { 1, 92.0f, false },
     [FONT_TITLE]  = { 1, 60.0f, true },
     [FONT_UI]     = { 0, 30.0f, true },
+    [FONT_LABEL]  = { 1, 21.0f, true },
+    [FONT_SMALL]  = { 0, 17.0f, true },
 };
 
 static void          *data[2];

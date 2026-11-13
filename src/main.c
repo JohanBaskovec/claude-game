@@ -34,6 +34,12 @@ typedef struct App {
     Menu            menu;
     bool            in_menu;   /* menu principal affiché (au lancement) */
 
+    /* Le jeu est dessiné dans `screen` (960x540), puis grossi pour remplir la fenêtre (GDD §24). */
+    SDL_Texture    *screen;
+    SDL_Texture    *big;        /* screen grossi d'un facteur entier, sans lissage */
+    int             big_factor;
+    SDL_FRect       dest;       /* où le jeu est affiché dans la fenêtre, en pixels de sortie */
+
     Uint64          last_ns;
     Uint64          accumulator_ns;
 
@@ -73,9 +79,94 @@ static void step(App *app, float dt)
     game_step(&app->game, &in, dt);
 }
 
+/* Place du jeu dans la fenêtre : le plus grand possible en gardant les proportions, centré. */
+static void update_dest(App *app)
+{
+    int ow = GAME_W, oh = GAME_H;
+    SDL_GetCurrentRenderOutputSize(app->renderer, &ow, &oh);
+    float scale = SDL_min((float)ow / GAME_W, (float)oh / GAME_H);
+    float w = SDL_floorf(GAME_W * scale + 0.5f), h = SDL_floorf(GAME_H * scale + 0.5f);
+    app->dest = (SDL_FRect){ SDL_floorf(((float)ow - w) * 0.5f), SDL_floorf(((float)oh - h) * 0.5f), w, h };
+}
+
+/* Coordonnées de rendu de la fenêtre (pixels de sortie) -> coordonnées du jeu (960x540). */
+static void to_game(const App *app, float *x, float *y)
+{
+    if (!app->screen || app->dest.w <= 0.0f || app->dest.h <= 0.0f) return;   /* présentation logique de SDL */
+    *x = (*x - app->dest.x) * GAME_W / app->dest.w;
+    *y = (*y - app->dest.y) * GAME_H / app->dest.h;
+}
+
+/* Événement de souris en coordonnées du jeu. */
+static SDL_Event game_event(const App *app, const SDL_Event *event)
+{
+    SDL_Event local = *event;
+    SDL_ConvertEventToRenderCoordinates(app->renderer, &local);
+    switch (local.type) {
+    case SDL_EVENT_MOUSE_MOTION:
+        to_game(app, &local.motion.x, &local.motion.y);
+        break;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+        to_game(app, &local.button.x, &local.button.y);
+        break;
+    case SDL_EVENT_MOUSE_WHEEL:
+        to_game(app, &local.wheel.mouse_x, &local.wheel.mouse_y);
+        break;
+    default:
+        break;
+    }
+    return local;
+}
+
+/*
+ * Affiche `screen` dans la fenêtre. Facteur entier : directement, sans lissage. Sinon, grossi
+ * sans lissage au facteur entier supérieur, puis réduit avec lissage : les pixels restent nets
+ * et tous de la même taille.
+ */
+static void present(App *app)
+{
+    SDL_Renderer *r = app->renderer;
+    SDL_SetRenderTarget(r, NULL);
+    SDL_SetRenderDrawColor(r, 0, 0, 0, 255);
+    SDL_RenderClear(r);
+    update_dest(app);
+    float scale = app->dest.w / GAME_W;
+    int factor = (int)SDL_ceilf(scale - 0.01f);
+    if (factor <= 1 || SDL_fabsf(scale - SDL_roundf(scale)) < 0.01f) {
+        SDL_SetTextureScaleMode(app->screen, scale < 1.0f ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+        SDL_RenderTexture(r, app->screen, NULL, &app->dest);
+    } else {
+        if (factor != app->big_factor || !app->big) {
+            if (app->big) SDL_DestroyTexture(app->big);
+            app->big = SDL_CreateTexture(r, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, GAME_W * factor, GAME_H * factor);
+            app->big_factor = factor;
+            if (app->big) SDL_SetTextureScaleMode(app->big, SDL_SCALEMODE_LINEAR);
+        }
+        if (app->big) {
+            SDL_SetTextureScaleMode(app->screen, SDL_SCALEMODE_NEAREST);
+            SDL_SetRenderTarget(r, app->big);
+            SDL_RenderTexture(r, app->screen, NULL, NULL);
+            SDL_SetRenderTarget(r, NULL);
+            SDL_RenderTexture(r, app->big, NULL, &app->dest);
+        } else {
+            SDL_SetTextureScaleMode(app->screen, SDL_SCALEMODE_LINEAR);
+            SDL_RenderTexture(r, app->screen, NULL, &app->dest);
+        }
+    }
+    SDL_RenderPresent(r);
+}
+
+static void finish_frame(App *app)
+{
+    if (app->screen) present(app);
+    else SDL_RenderPresent(app->renderer);
+}
+
 static void render(App *app, float alpha)
 {
     SDL_Renderer *r = app->renderer;
+    if (app->screen) SDL_SetRenderTarget(r, app->screen);
     SDL_SetRenderDrawColor(r, 0, 0, 0, 255);
     SDL_RenderClear(r);
 
@@ -83,7 +174,7 @@ static void render(App *app, float alpha)
     game_render(g, r, alpha);
     if (app->in_menu) {
         menu_render(&app->menu, r);
-        SDL_RenderPresent(r);
+        finish_frame(app);
         return;
     }
 
@@ -115,7 +206,7 @@ static void render(App *app, float alpha)
     float mx, my;
     if (input_mouse_visible(&mx, &my)) draw_crosshair(r, mx, my);
 
-    SDL_RenderPresent(r);
+    finish_frame(app);
 }
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
@@ -142,8 +233,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
         SDL_Log("Création de la fenêtre impossible : %s", SDL_GetError());
         return SDL_APP_FAILURE;
     }
-    SDL_SetRenderLogicalPresentation(app->renderer, GAME_W, GAME_H,
-                                     SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
+    app->screen = SDL_CreateTexture(app->renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, GAME_W, GAME_H);
+    if (!app->screen) {
+        /* Pas de texture cible : SDL agrandit lui-même, avec des bandes noires. */
+        SDL_Log("Texture cible impossible (%s) : présentation logique de SDL", SDL_GetError());
+        SDL_SetRenderLogicalPresentation(app->renderer, GAME_W, GAME_H, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    }
     SDL_SetRenderVSync(app->renderer, 1);
     /* Le curseur du système sert au menu ; en partie, le jeu dessine son viseur (GDD §17). */
 
@@ -177,8 +272,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
             SDL_SetWindowFullscreen(app->window, !fs);
             return SDL_APP_CONTINUE;
         }
-        SDL_Event local = *event;
-        SDL_ConvertEventToRenderCoordinates(app->renderer, &local);
+        SDL_Event local = game_event(app, event);
         switch (menu_handle_event(&app->menu, &local)) {
         case MENU_PLAY:
             app->in_menu = false;
@@ -218,8 +312,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     }
 
     /* Souris : passage des coordonnées fenêtre aux coordonnées du jeu (960x540). */
-    SDL_Event local = *event;
-    SDL_ConvertEventToRenderCoordinates(app->renderer, &local);
+    SDL_Event local = game_event(app, event);
     input_handle_event(&local);
 
     /* Clic sur la mini-carte : téléportation (et pas de tir). Clic sur le menu de debug : pas de tir. */
@@ -268,6 +361,7 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     float mx, my, lx, ly;
     SDL_GetMouseState(&mx, &my);
     SDL_RenderCoordinatesFromWindow(app->renderer, mx, my, &lx, &ly);
+    to_game(app, &lx, &ly);
     app->game.reveal_map = app->debug.open;
     app->game.map_hover = minimap_room_at(&app->game.floor, lx, ly, app->game.reveal_map, NULL, NULL);
 
@@ -291,6 +385,8 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     decor_quit();
     sprite_quit();
     if (app) {
+        if (app->big) SDL_DestroyTexture(app->big);
+        if (app->screen) SDL_DestroyTexture(app->screen);
         SDL_DestroyRenderer(app->renderer);
         SDL_DestroyWindow(app->window);
         SDL_free(app);

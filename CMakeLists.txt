@@ -66,6 +66,7 @@ add_executable(fugue
     src/text.c
     src/ui_text.c
     src/menu.c
+    src/describe.c
     src/weapon.c
 )
 

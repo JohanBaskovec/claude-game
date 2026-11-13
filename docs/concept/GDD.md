@@ -3,7 +3,7 @@
 > Document de travail destiné à Claude Code. Il décrit l'univers et les choix de design.
 > **Statut : en cours de conception.** Les sections marquées ✅ sont décidées, 💡 sont des idées à valider, ❓ sont des questions ouvertes.
 > **Source de vérité du design : ce fichier, dans le dépôt** (`docs/concept/GDD.md`). La conception se fait désormais uniquement avec Claude Code, qui le met à jour au fil des décisions prises avec Johan.
-> **Phase en cours : aucune (Phase 14 terminée).** Les Phases 1 à 14 (sections 10 à 23) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
+> **Phase en cours : aucune (Phase 17 terminée).** Les Phases 1 à 17 (sections 10 à 26) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
 
 ---
 
@@ -208,6 +208,8 @@ Précisions ✅ :
 ## 8. Étages et ennemis 💡
 
 On découpe par **époques** plutôt que par siècles, car entre le IXe et le XIIe rien ne change visuellement. Chaque époque amène des instruments, des partitions et des objets de son temps.
+
+✅ **Chaque ennemi a le style de l'époque où il apparaît pour la première fois** (un moine du premier étage chante des neumes), **mais il peut revenir dans les étages suivants**, avec son style d'origine : un moine grégorien au milieu des automates classiques, c'est drôle.
 
 | # | Époque | Idées d'ennemis |
 |---|---|---|
@@ -720,7 +722,7 @@ Les taches qui restent quand on revient dans une salle, les morceaux d'ennemis (
 **But** : les premiers sons, en commençant par le tir. Tout est synthétisé par le jeu (aucun fichier audio), comme le décor.
 
 ### Son du tir : Amadeus chante *Ut queant laxis* ✅
-- À chaque tir, Amadeus **chante la syllabe suivante d'un chant grégorien**. Au début de la partie, c'est l'hymne ***Ut queant laxis*** (Paul Diacre, VIIIe s.), celui dont Guido d'Arezzo a tiré les noms des notes ut, ré, mi, fa, sol, la. Son texte est déjà écrit sur le sol.
+- À chaque tir, Amadeus **chante la syllabe suivante d'un chant grégorien**. Au début de la partie, c'est l'hymne ***Ut queant laxis*** (Paul Diacre, VIIIe s.), celui dont Guido d'Arezzo a tiré les noms des notes ut, ré, mi, fa, sol, la. Son texte est déjà écrit sur le sol. *(Remplacé en Phase 17 : Amadeus chante de la pop moderne, section 26 ; les chants grégoriens sont aux moines.)*
 - Chaque syllabe a ses vraies notes : une seule note, ou un petit groupe (neume) chanté d'un trait. Il chante la **vraie voyelle** de la syllabe (« Ut » sur u, « la » sur a…).
 - La mélodie continue d'un tir à l'autre.
 - Voix d'enfant, un peu synthétique : ça va avec le pixel art. Chaque chant est transposé pour que le milieu de sa tessiture tombe vers fa5.
@@ -734,7 +736,7 @@ Les taches qui restent quand on revient dans une salle, les morceaux d'ennemis (
   - *Pange lingua* (p. 957) ;
   - *Dies irae* (séquence des défunts, 2 strophes, p. 1810) ;
   - *Victimae paschali laudes* (séquence de Pâques, p. 780).
-- **Il change de chant quand on arrête de tirer plus de 2 secondes** (`tuning.chant_pause`), et aussi quand le chant est fini. Le nouveau chant est tiré au hasard parmi les autres, et commence à sa première syllabe.
+- **Il change de chant quand on arrête de tirer plus de 2 secondes** (`tuning.chant_pause`), et aussi quand le chant est fini. *(Remplacé en Phase 15 : il change à chaque arrêt du tir, section 24.)* Le nouveau chant est tiré au hasard parmi les autres, et commence à sa première syllabe.
 - Les mélodies sont dans `src/chant_data.h`, généré depuis les fichiers GABC de GregoBase.
 
 ### Technique ✅
@@ -756,7 +758,7 @@ Les autres sons (dégâts, morts, métronome, ennemis, interface), les sons des 
 - **Un ennemi meurt** : un « splotch » mouillé qui va avec l'explosion (§18) : choc grave, éclaboussure qui s'assourdit, petites bulles. Le même pour tous les ennemis ; celui du **boss** est plus grave et plus long.
 - **Métronome posé** : un **tic-tac** à chaque battement du balancier (tic, tac, tic…), qui accélère avec lui (de 2 à 10 battements par seconde), puis l'**explosion** : craquement, grondement grave, et les morceaux de bois du métronome qui retombent.
 - **Plume géante** : un **crachat d'encre** quand elle tire (« pfut », jet mouillé qui descend, petit « bloup »).
-- **Moine chanteur** : à chaque note tirée, il **chante une note grave de chant grégorien**, toujours la même (ré3, voix d'homme sur « o ») avec une légère variation.
+- **Moine chanteur** : à chaque note tirée, il **chante une note grave de chant grégorien**, toujours la même (ré3, voix d'homme sur « o ») avec une légère variation. *(Remplacé en Phase 16 : il chante de vrais chants, section 25.)*
 - **Sonneur de cloche** : un **coup de cloche** d'église (bourdon, tierce mineure, quinte…) qui résonne plus d'une seconde, à chaque salve.
 - **Ver de livre** : un bruit de **ver qui creuse** pendant que le sol se soulève avant sa sortie : grondement sourd et grattements de plus en plus serrés.
 - **Bébés** : ils **pleurent de temps en temps, pas en continu**. Deux pleurs : un long « ouiiin » ou un sanglot « oua… ouaaah » avec une inspiration entre les deux. Voix aiguë, tendue et un peu éraillée, qui monte puis retombe. Chaque bébé pleure toutes les 4 à 10 s, au hasard (`baby_cry_min`, `baby_cry_max`). Jamais deux pleurs à moins de 3 s d'écart dans la salle, quel que soit le nombre de bébés (`baby_cry_gap`). Le **Gros Bébé** pleure aussi, plus grave et plus lentement (`boss_cry_pitch`).
@@ -882,3 +884,66 @@ Usage de la clef d'ut, vendeur dessiné dans le magasin, autres choses en vente 
 
 ### Hors périmètre (ne pas faire)
 Menu pause, options (volume, langue, touches), écran de mort, cinématique d'intro, titres des autres étages, Échap pendant la partie (il quitte toujours le jeu sur ordinateur).
+
+## 24. PHASE 15 — Notes modernes, cri, descriptions, fenêtre, neumes ✅ terminée
+
+**But** : des tirs qui se lisent comme une partition, un retour sonore aux dégâts, des objets compréhensibles avant de les prendre, et un jeu qui remplit la fenêtre.
+
+### Cri d'Amadeus ✅
+- Quand Amadeus prend un dégât (ennemi, tir, piège, coup de pied de Lully…), il pousse un **cri** bref d'enfant (« aïe ! »), synthétisé comme sa voix chantée.
+
+### Descriptions des objets ✅
+- Comme le mod *External Item Descriptions* de TBOI : quand Amadeus s'approche d'un objet posé (lutrin du trésor, du boss, du magasin, socle d'arme, objet dans une boîte dorée ouverte), un **cadre** affiche son nom et ce qu'il fait **exactement**, avec les chiffres (« +1 dégât », « 1 tir sur 20 part dans ton pied : −1 PV »…).
+- Armes : la description se calcule depuis leurs réglages (dégâts ×3, cadence ×0,4, étourdit 1 s…), pour rester juste quand on les règle.
+- Au magasin : le prix, en rouge si on n'a pas assez de royalties.
+- Le bandeau qui s'affiche quand on prend l'objet reste (nom et petite phrase drôle).
+
+### Tirs d'Amadeus : notes modernes selon la cadence ✅
+- Les notes d'Amadeus deviennent des **notes de musique modernes**, dont la **valeur dépend de la cadence de tir** : plus on tire vite, plus la note est courte.
+- De la plus lente à la plus rapide : **ronde, blanche, noire, croche, double croche, triple croche, quadruple croche**. Au départ (3 tirs/s), Amadeus tire des noires.
+- Réglage : durée de la noire (`tuning.note_quarter_time`) ; la note choisie est celle dont la durée est la plus proche du temps entre deux tirs.
+- **Le son suit** : chaque syllabe chantée dure le temps entre deux tirs, moins un **petit silence** (au moins 30 ms), pour que les sons ne se chevauchent jamais. Cadence extrêmement rapide : quadruple croche, son très court ; cadence extrêmement lente : ronde, son très long.
+- Les autres formes de tir (onde du tabourin, cloche, orgue) ne changent pas.
+
+### Chant : changement de mélodie ✅
+- Amadeus change de chant **à chaque fois qu'on arrête de tirer** (aucun tir pendant un peu plus que le temps entre deux tirs), et quand le chant est fini. Remplace la pause de 2 s de la Phase 10.
+
+### Fenêtre ✅
+- Le jeu s'agrandit pour **remplir la fenêtre**, à n'importe quelle taille, plus seulement en plein écran par paliers entiers. Il garde ses proportions (16:9) : il ne reste des bandes noires que si la fenêtre n'a pas ces proportions.
+- Agrandissement net : le jeu est grossi d'un facteur entier sans lissage, puis ramené à la taille de la fenêtre avec un léger lissage (pas de pixels de tailles inégales).
+
+### Tirs des moines et des sonneurs : neumes ✅
+- Les notes tirées par les moines et les sonneurs deviennent des **neumes** de Saint-Gall (virga, pes, clivis, torculus, porrectus…), comme ceux écrits sur le sol, à l'encre rouge cernée de noir pour rester bien visibles.
+- C'est la règle de la section 8 : chaque ennemi a le style de son époque.
+
+### Hors périmètre (ne pas faire)
+Sons des autres dégâts (ennemis touchés), descriptions des prix et des clefs, autres étages et leurs ennemis, choix de la taille de fenêtre dans un menu.
+
+## 25. PHASE 16 — Les moines chantent de vrais chants ✅ terminée
+
+**But** : les moines ne tirent plus des neumes au hasard : ils **chantent pour de vrai** un chant grégorien, syllabe par syllabe, et chaque tir est le neume de la syllabe chantée.
+
+### Le chant des moines ✅
+- Chaque moine chante un **vrai chant grégorien**, tiré au hasard parmi ceux du jeu (*Ut queant laxis*, *Veni Creator*, *Ave maris stella*, *Pange lingua*, *Dies irae*, *Victimae paschali laudes*). Chaque note de sa rafale est la **syllabe suivante**. Le chant continue d'une rafale à l'autre ; fini, il en commence un autre.
+- Il chante la syllabe **pour de vrai** : sa voyelle, sa mélodie (toutes ses notes), d'une voix d'homme deux octaves sous Amadeus. Plusieurs moines dans une salle : une polyphonie involontaire.
+- **Le tir est le neume de la syllabe** : un neume de Saint-Gall qui suit la mélodie. Une note : *virga* si elle monte, *punctum* si elle descend, *tractulus* si elle répète. Deux notes : *pes* (monte), *clivis* (descend), *distropha* (répète). Trois : *scandicus*, *climacus*, *torculus* (monte puis descend), *porrectus* (descend puis remonte). Plus de trois notes : plusieurs neumes à la suite (jusqu'à trois).
+- **La syllabe latine est écrite sous le neume**, à l'encre, comme dans un manuscrit (« Di », « es », « í », « rae »…).
+- Volume de la voix des moines : `tuning.monk_voice_volume` (remplace le son de la note grave fixe).
+
+### Hors périmètre (ne pas faire)
+Sonneurs (leurs tirs restent des neumes au hasard avec la cloche), nouveaux chants, chœur de moines synchronisés.
+
+## 26. PHASE 17 — Amadeus chante de la pop ✅ terminée
+
+**But** : le contraste. Les moines chantent le Moyen Âge ; Amadeus, enfant d'aujourd'hui, chante **dans un style moderne**.
+
+### Les chansons d'Amadeus ✅
+- Amadeus ne chante plus de chants grégoriens : il chante des **chansons pop originales**, composées pour le jeu (pas de vraies chansons récentes : mélodies et paroles protégées par le droit d'auteur).
+- Style tube d'aujourd'hui : gamme majeure, refrains qui se répètent, petites vocalises façon R&B sur les « oh », « yeah », « ooh ».
+- **Paroles : clichés pop anglais**, drôles dans la bouche d'un enfant de 8 ans (« oh baby yeah », « tonight », « na na na », « my heart goes boom », « put your hands up »). On n'entend que les voyelles et un peu les consonnes.
+- Six chansons : *Yeah Yeah Baby*, *Tonight*, *Na Na Summer*, *Heartbeat*, *Forever*, *Hands Up*. Les règles ne changent pas : une syllabe par tir, durée selon la cadence (section 24), nouvelle chanson à chaque arrêt du tir et en fin de chanson.
+- Les mélodies sont écrites en degrés de la gamme dans `docs/concept/outils_concept/make_songs.py`, qui génère `src/song_data.h`.
+- 💡 Plus tard : une chanson par époque traversée qui « contamine » Amadeus ? Accompagnement (boîte à rythmes) ?
+
+### Hors périmètre (ne pas faire)
+Accompagnement instrumental, autres langues de paroles, texte des paroles affiché.

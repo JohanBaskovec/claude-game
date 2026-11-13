@@ -2,6 +2,7 @@
 #include "audio.h"
 #include "config.h"
 #include "decor.h"
+#include "describe.h"
 #include "draw.h"
 #include "minimap.h"
 #include "obstacle.h"
@@ -355,7 +356,7 @@ static void fire(Game *g, PlayerFire f)
         return;
     }
 
-    audio_sing(g->time);   /* Amadeus chante la syllabe suivante du chant en cours */
+    audio_sing(g->time, weapon_shot_interval(&p->stats));   /* la syllabe suivante, aussi longue que la cadence le permet */
     float dx = f.dx, dy = f.dy, cx, cy;
     player_center(p, &cx, &cy);
     ShotSpec s = weapon_shot(&p->stats, g->owned, f.charge);
@@ -387,6 +388,7 @@ static void fire(Game *g, PlayerFire f)
         if (!pr) break;
         pr->kind = s.kind;
         pr->size = s.size;
+        pr->note = weapon_note_value(&p->stats);
         pr->stun = s.stun;
         pr->spectral = s.spectral;
         pr->pause = s.pause;
@@ -560,18 +562,29 @@ static void resolve_shots_vs_enemies(Game *g)
 }
 
 /* Un ennemi tire (GDD §16) : notes du moine, éventail du sonneur, goutte d'encre de la plume. */
-static void enemy_fire(Game *g, const Enemy *e, float px, float py)
+static void enemy_fire(Game *g, Enemy *e, float px, float py)
 {
     float ex, ey;
     enemy_center(e, &ex, &ey);
     float dx = px - ex, dy = py - ey, len = sqrtf(dx * dx + dy * dy);
     float ux = len > 0.0f ? dx / len : 0.0f, uy = len > 0.0f ? dy / len : 1.0f;
     switch (e->type) {
-    case ENEMY_MONK:
-        audio_play(SOUND_MONK_NOTE, 1.0f);
-        bullet_spawn_note(&g->bullets, ex + ux * 10.0f, ey + uy * 10.0f, ux * tuning.monk_note_speed, uy * tuning.monk_note_speed,
-                          tuning.monk_note_range, 1.0f, tuning.enemy_note_height);
+    case ENEMY_MONK: {
+        /* Il chante la syllabe suivante de son chant, et le tir en est le neume (GDD §25). */
+        if (e->chant < 0 || e->syllable >= audio_chant_length(e->chant)) {
+            int n = audio_chant_count(), c = SDL_rand(n);
+            if (n > 1 && c == e->chant) c = (c + 1) % n;   /* fini : un autre chant */
+            e->chant = (Sint16)c;
+            e->syllable = 0;
+        }
+        int c = e->chant, sy = e->syllable++;
+        const char *prev = sy > 0 ? audio_syllable_notes(c, sy - 1) : "";
+        audio_monk_sing(c, sy, audio_syllable_duration(tuning.monk_note_interval));
+        Bullet *b = bullet_spawn_note(&g->bullets, ex + ux * 10.0f, ey + uy * 10.0f, ux * tuning.monk_note_speed,
+                                      uy * tuning.monk_note_speed, tuning.monk_note_range, 1.0f, tuning.enemy_note_height);
+        if (b) bullet_set_syllable(b, audio_syllable_text(c, sy), audio_syllable_notes(c, sy), prev[0] ? prev[SDL_strlen(prev) - 1] : 0);
         break;
+    }
     case ENEMY_RINGER: {
         audio_play(SOUND_BELL, 1.0f);
         int n = SDL_max(tuning.ringer_notes, 1);
@@ -925,7 +938,7 @@ static void aim_direction(const Game *g, const Input *in, float *ax, float *ay)
     *ay = dy / len;
 }
 
-void game_step(Game *g, const Input *in, float dt)
+static void step_inner(Game *g, const Input *in, float dt)
 {
     g->time += dt;
     if (g->shake_timer > 0.0f) g->shake_timer -= dt;
@@ -958,7 +971,7 @@ void game_step(Game *g, const Input *in, float dt)
     room_update_nav(&g->room, px, py);   /* les ennemis contournent obstacles et trous */
     enemy_update_all(&g->enemies, &g->room, px, py, dt);
     for (int i = 0; i < MAX_ENEMIES; i++) {
-        const Enemy *e = &g->enemies.items[i];
+        Enemy *e = &g->enemies.items[i];
         if (!e->active) continue;
         if (e->surfaced) worm_hole(g, e);
         if (e->landed) boss_landed(g);
@@ -1054,6 +1067,51 @@ void game_step(Game *g, const Input *in, float dt)
     }
 
     hud_update(&g->hud, &g->player.stats, dt);
+}
+
+/* Objet posé le plus proche d'Amadeus, à décrire dans un cadre (GDD §24). Faux s'il n'y en a pas. */
+static bool nearby_description(const Game *g, Description *d)
+{
+    const FloorRoom *fr = &g->floor.rooms[g->room.index];
+    const PlayerStats *st = &g->player.stats;
+    float px, py;
+    player_center(&g->player, &px, &py);
+    float best = tuning.describe_distance * tuning.describe_distance;
+    int prop = -1, box = -1;
+    for (int i = 0; i < g->room.prop_count; i++) {
+        PropKind k = g->room.prop_kind[i];
+        bool full = (k == PROP_WEAPON && fr->weapon_offer >= 0) || (k == PROP_HEAL && !fr->heal_sold) ||
+                    (k == PROP_LUTRIN && i < TREASURE_OFFERS && fr->offers[i] >= 0);
+        if (!full) continue;
+        const SDL_FRect *b = &g->room.props[i];
+        float dx = b->x + b->w * 0.5f - px, dy = b->y + b->h * 0.5f - py;
+        if (dx * dx + dy * dy < best) { best = dx * dx + dy * dy; prop = i; }
+    }
+    for (int i = 0; i < fr->box_count; i++) {
+        const MusicBox *b = &fr->boxes[i];
+        if (!b->open || b->item < 0) continue;
+        float dx = b->x - px, dy = b->y - py;
+        if (dx * dx + dy * dy < best) { best = dx * dx + dy * dy; box = i; prop = -1; }
+    }
+    if (box >= 0) {
+        describe_item(d, (ItemId)fr->boxes[box].item);
+        return true;
+    }
+    if (prop < 0) return false;
+    PropKind k = g->room.prop_kind[prop];
+    if (k == PROP_WEAPON) describe_weapon(d, (WeaponId)fr->weapon_offer);
+    else if (k == PROP_HEAL) describe_heal(d);
+    else describe_item(d, (ItemId)fr->offers[prop]);
+    if (fr->kind == ROOM_SHOP) describe_price(d, tuning.shop_price, st->coins, k == PROP_HEAL && st->hp >= st->max_hp);
+    return true;
+}
+
+void game_step(Game *g, const Input *in, float dt)
+{
+    /* Un dégât, quelle qu'en soit la source (ou la mort, qui relance une partie) : Amadeus crie. */
+    int hp0 = g->player.stats.hp, deaths0 = g->deaths;
+    step_inner(g, in, dt);
+    if (g->player.stats.hp < hp0 || g->deaths != deaths0) audio_play(SOUND_HURT, 1.0f);
 }
 
 /* Ce qui est trié par profondeur : on dessine d'abord ce dont le pied est le plus haut. */
@@ -1311,6 +1369,8 @@ void game_render(const Game *g, SDL_Renderer *r, float alpha)
         if (boss && !t->active) hud_render_boss(r, boss->hp, boss->max_hp);
         int hover = game_can_teleport(g, g->map_hover) ? g->map_hover : -1;
         minimap_render(&g->floor, g->room.index, r, g->reveal_map, hover);
+        Description desc;
+        if (!t->active && nearby_description(g, &desc)) describe_render(&desc, r);
     }
 
     /* Hors des glissements, on dessine à l'avance une salle voisine par image. */

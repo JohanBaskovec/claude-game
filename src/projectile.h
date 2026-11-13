@@ -19,6 +19,7 @@ typedef struct Projectile {
     float    range;           /* distance maximale (rayon final pour la cloche), px */
     float    damage;          /* dégâts infligés, fixés au moment du tir */
     float    size;            /* taille (1 = note de la voix) */
+    NoteValue note;           /* apparence de la note (selon la cadence au moment du tir) */
     float    stun;            /* étourdit l'ennemi touché, s */
     bool     spectral;        /* passe au-dessus des obstacles (Altius) */
     bool     pause;           /* s'arrête un instant en l'air (Expectare) */

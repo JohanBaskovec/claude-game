@@ -1,4 +1,5 @@
 #include "projectile.h"
+#include "sprite.h"
 #include "draw.h"
 
 #include <math.h>
@@ -18,7 +19,7 @@ static Projectile *alloc(ProjectilePool *pool)
     for (int i = 0; i < MAX_PROJECTILES; i++) {
         Projectile *pr = &pool->items[i];
         if (!pr->active && !pr->ink_drop) {
-            *pr = (Projectile){ .active = true, .kind = SHOT_NOTE, .size = 1.0f };
+            *pr = (Projectile){ .active = true, .kind = SHOT_NOTE, .size = 1.0f, .note = NOTE_QUARTER };
             return pr;
         }
     }
@@ -180,8 +181,8 @@ bool projectile_hits_box(const Projectile *pr, const SDL_FRect *b)
     return false;
 }
 
-/* Une croche (♪) en rectangles : tête, hampe, crochet ; s = taille. */
-static void draw_note(SDL_Renderer *r, float x, float y, float s)
+/* Croche de secours (si la planche des notes manque), en rectangles : tête, hampe, crochet ; s = taille. */
+static void draw_fallback_note(SDL_Renderer *r, float x, float y, float s)
 {
     SDL_Color ink = { 25, 18, 30, 255 }, pink = { 255, 70, 168, 255 };
     x = SDL_floorf(x);
@@ -203,7 +204,14 @@ static void render_one(const Projectile *pr, SDL_Renderer *r, float alpha, Camer
         float h = tuning.shot_height * (pr->spectral ? tuning.altius_height_mul : 1.0f);
         draw_ellipse(r, x, y, 5.0f * pr->size, 2.0f * pr->size, (SDL_Color){ 60, 40, 30, 90 });
         float wobble = pr->pause_left > 0.0f ? sinf(pr->age * 40.0f) * 1.5f : 0.0f;   /* elle frémit pendant la pause */
-        draw_note(r, x + wobble, y - h, pr->size);
+        /* note moderne selon la cadence (GDD §24), la tête à la hauteur de vol */
+        SpriteId id = (SpriteId)(SPR_NOTE_WHOLE + pr->note);
+        if (sprite_available(id)) {
+            sprite_draw_scaled(r, id, x + wobble - SPR_NOTE_HEAD_X * pr->size, y - h - SPR_NOTE_HEAD_Y * pr->size,
+                               pr->size, false, false);
+        } else {
+            draw_fallback_note(r, x + wobble, y - h, pr->size);
+        }
         break;
     }
     case SHOT_WAVE: {

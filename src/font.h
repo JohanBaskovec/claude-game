@@ -16,6 +16,8 @@ typedef enum FontId {
     FONT_CAP,      /* grande lettrine : Bold 92 px */
     FONT_TITLE,    /* titres de l'interface (menu, époque) : Bold 60 px */
     FONT_UI,       /* boutons de l'interface : Medium 30 px */
+    FONT_LABEL,    /* titres des petits cadres (descriptions) : Bold 21 px */
+    FONT_SMALL,    /* texte des petits cadres : Medium 17 px */
     FONT_COUNT
 } FontId;
 

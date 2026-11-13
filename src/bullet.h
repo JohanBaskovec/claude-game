@@ -22,6 +22,9 @@ typedef struct Bullet {
     float      prev_x, prev_y;  /* position au pas précédent, pour l'interpolation */
     float      vx, vy;          /* note : px/s */
     float      size;            /* note : 1 = note du moine */
+    Uint8      neumes[3];       /* note : neumes à la suite (un au hasard, ou ceux de la syllabe chantée) */
+    Uint8      neume_count;
+    const char *text;           /* note : syllabe latine écrite sous le neume (moines), NULL sinon */
     float      height;          /* note : hauteur de vol (affichage), px */
     float      traveled, range; /* note : distance parcourue et maximale, px */
     float      from_x, from_y;  /* goutte : départ ... */
@@ -35,8 +38,12 @@ typedef struct BulletPool {
 
 void bullet_pool_clear(BulletPool *pool);
 
-/* Note partant de (x, y) au sol. Renvoie NULL si le pool est plein. */
+/* Note (un neume de Saint-Gall, GDD §24) partant de (x, y) au sol. Renvoie NULL si le pool est plein. */
 Bullet *bullet_spawn_note(BulletPool *pool, float x, float y, float vx, float vy, float range, float size, float height);
+
+/* La note devient le(s) neume(s) de la syllabe chantée (GDD §25) : `notes` une lettre par note
+ * ('a' = la plus grave), `prev` la note d'avant (0 si aucune), `text` la syllabe écrite dessous. */
+void bullet_set_syllable(Bullet *b, const char *text, const char *notes, char prev);
 
 /* Goutte d'encre de (x, y) jusqu'à (tx, ty) en `flight` secondes. */
 Bullet *bullet_spawn_ink(BulletPool *pool, float x, float y, float tx, float ty, float flight);

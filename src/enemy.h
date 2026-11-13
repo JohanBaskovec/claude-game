@@ -48,6 +48,8 @@ typedef struct Enemy {
     int       state;          /* BossState, WormState ou ShooterState selon le type */
     float     action_timer;   /* s avant la prochaine rafale, le prochain crachat ou coup de cloche */
     int       burst_left;     /* moine : notes restantes de la rafale */
+    Sint16    chant;          /* moine : chant grégorien qu'il chante (GDD §25), -1 avant la première note */
+    Sint16    syllable;       /* moine : syllabe chantée à la prochaine note */
     float     sing_timer;     /* > 0 : bouche ouverte (moine), cloche qui sonne (sonneur) */
     bool      fire;           /* vrai pendant le pas où il tire, lu par game.c */
     bool      dig;            /* ver : vrai pendant le pas où il commence à creuser vers la surface */

@@ -20,6 +20,7 @@ typedef enum SheetId {
     SHEET_BELL,
     SHEET_OBSTACLES,
     SHEET_PICKUPS,
+    SHEET_NOTES,
     SHEET_COUNT
 } SheetId;
 
@@ -43,6 +44,8 @@ static const struct { const char *file; int cell_w, cell_h; } SHEETS[SHEET_COUNT
     /* Clefs et boîtes à musique de la phase 13 (planche provisoire) : objets centrés dans leur case,
      * le bas des boîtes à 4 px du bas de la case. */
     [SHEET_PICKUPS]   = { "assets/sprites/pickups/pickups.png", 48, 48 },
+    /* Notes d'Amadeus de la phase 15 (planche de Claude) : ronde ... quadruple croche. */
+    [SHEET_NOTES]     = { "assets/sprites/notes/notes.png", 32, 48 },
 };
 
 typedef struct SpriteDef {
@@ -113,6 +116,13 @@ static const SpriteDef DEFS[SPR_COUNT] = {
     [SPR_KEY_SOL_SMALL]   = DEF_PNG(SHEET_PICKUPS, 7),
     [SPR_KEY_FA_SMALL]    = DEF_PNG(SHEET_PICKUPS, 8),
     [SPR_KEY_UT_SMALL]    = DEF_PNG(SHEET_PICKUPS, 9),
+    [SPR_NOTE_WHOLE]      = DEF_PNG(SHEET_NOTES, 0),
+    [SPR_NOTE_HALF]       = DEF_PNG(SHEET_NOTES, 1),
+    [SPR_NOTE_QUARTER]    = DEF_PNG(SHEET_NOTES, 2),
+    [SPR_NOTE_EIGHTH]     = DEF_PNG(SHEET_NOTES, 3),
+    [SPR_NOTE_16TH]       = DEF_PNG(SHEET_NOTES, 4),
+    [SPR_NOTE_32ND]       = DEF_PNG(SHEET_NOTES, 5),
+    [SPR_NOTE_64TH]       = DEF_PNG(SHEET_NOTES, 6),
 };
 
 #define MAX_SPRITE_PIXELS (64 * 64)
@@ -192,6 +202,12 @@ int sprite_ama_head_above_body(void)
 {
     /* Grilles : tête de 45 lignes dont la ligne 0 est 2 px au-dessus du crâne, corps à y = 37. */
     return sheet_of(SPR_AMA_HEAD_FRONT) != SHEET_NONE ? SHEETS[SHEET_AMA_HEAD].cell_h - 8 : 39;
+}
+
+bool sprite_available(SpriteId id)
+{
+    if (id < 0 || id >= SPR_COUNT) return false;
+    return sheet_of(id) != SHEET_NONE || DEFS[id].rows != NULL;
 }
 
 int sprite_width(SpriteId id)
@@ -305,13 +321,18 @@ void sprite_quit(void)
 
 void sprite_draw(SDL_Renderer *r, SpriteId id, float x, float y, bool flip, bool white)
 {
+    sprite_draw_scaled(r, id, x, y, 1.0f, flip, white);
+}
+
+void sprite_draw_scaled(SDL_Renderer *r, SpriteId id, float x, float y, float scale, bool flip, bool white)
+{
     if (id < 0 || id >= SPR_COUNT) return;
     if (r != owner) {
         drop_textures();
         owner = r;
     }
     int k = white ? 1 : 0;
-    SDL_FRect dst = { floorf(x), floorf(y), (float)sprite_width(id), (float)sprite_height(id) };
+    SDL_FRect dst = { floorf(x), floorf(y), floorf((float)sprite_width(id) * scale + 0.5f), floorf((float)sprite_height(id) * scale + 0.5f) };
     SDL_FlipMode fm = flip ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE;
     SheetId s = sheet_of(id);
     if (s != SHEET_NONE) {

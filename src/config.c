@@ -80,6 +80,7 @@ Tuning tuning = {
     .shake_amplitude     = 6.0f,
     .trapdoor_radius     = 22.0f,
 
+    .describe_distance      = 110.0f,
     .era_title_time         = 3.5f,
     .era_title_fade         = 0.7f,
     .item_banner_time       = 3.0f,
@@ -182,7 +183,12 @@ Tuning tuning = {
     .splat_boss_scale   = 2.6f,
 
     .sound_volume = 0.5f,
-    .chant_pause  = 2.0f,
+    .monk_voice_volume = 0.10f,
+    .chant_stop_factor = 1.5f,
+    .chant_stop_margin = 0.05f,
+    .note_gap_min      = 0.03f,
+    .note_gap_ratio    = 0.12f,
+    .note_quarter_time = 0.36f,
     .chant_volume = 1.0f,
     .sfx_volume   = 0.8f,
     .sound_gain = {
@@ -193,7 +199,6 @@ Tuning tuning = {
         [SOUND_TOCK]        = 0.40f,
         [SOUND_EXPLOSION]   = 1.00f,
         [SOUND_INK_SPIT]    = 0.30f,
-        [SOUND_MONK_NOTE]   = 0.05f,
         [SOUND_BELL]        = 0.15f,
         [SOUND_DIG]         = 0.30f,
         [SOUND_BABY_CRY]    = 0.30f,
@@ -202,6 +207,7 @@ Tuning tuning = {
         [SOUND_BOX_GOLD]    = 0.60f,
         [SOUND_KEY]         = 0.55f,
         [SOUND_UNLOCK]      = 0.70f,
+        [SOUND_HURT]        = 0.70f,
     },
     .shop_price           = 10,
     .shop_heal            = 10,

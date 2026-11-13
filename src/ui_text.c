@@ -2,7 +2,7 @@
 
 #include <math.h>
 
-#define CACHE_SIZE 24
+#define CACHE_SIZE 96   /* titres, boutons, descriptions, et les syllabes des moines en vol */
 #define MAX_CHARS  96
 #define BUF_W      1024
 #define BUF_H      128
