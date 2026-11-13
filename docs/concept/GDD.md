@@ -3,7 +3,7 @@
 > Document de travail destiné à Claude Code. Il décrit l'univers et les choix de design.
 > **Statut : en cours de conception.** Les sections marquées ✅ sont décidées, 💡 sont des idées à valider, ❓ sont des questions ouvertes.
 > **Source de vérité du design : ce fichier, dans le dépôt** (`docs/concept/GDD.md`). La conception se fait désormais uniquement avec Claude Code, qui le met à jour au fil des décisions prises avec Johan.
-> **Phase en cours : Phase 13 (section 22).** Les Phases 1 à 12 (sections 10 à 21) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
+> **Phase en cours : aucune (Phase 13 terminée).** Les Phases 1 à 13 (sections 10 à 22) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
 
 ---
 
@@ -814,7 +814,7 @@ Plans de salles faits à la main, salles secrètes, sons des obstacles, autres �
 
 ---
 
-## 22. PHASE 13 — Clefs, magasin, boîtes à musique
+## 22. PHASE 13 — Clefs, magasin, boîtes à musique ✅ terminée
 
 **But** : donner un usage aux royalties et des choses à ramasser : clefs, magasin (le **Luthier**), boîtes à musique, et une récompense à chaque salle vidée.
 
