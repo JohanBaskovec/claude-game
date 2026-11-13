@@ -202,6 +202,8 @@ typedef struct Tuning {
     float trapdoor_radius;            /* le centre du joueur à moins de tant = on tombe, px */
 
     /* Salle du trésor et objets (effets provisoires, GDD §13) */
+    float era_title_time;             /* titre d'époque à l'arrivée au premier étage : durée totale, s */
+    float era_title_fade;             /* ... fondus d'entrée et de sortie, s */
     float item_banner_time;           /* nom et effet affichés, s */
     float item_lully_damage;
     int   item_lully_foot_chance;     /* une note sur N frappe le pied */

@@ -19,11 +19,17 @@
 #pragma GCC diagnostic pop
 #endif
 
-#define FIRST_CP   32
-#define LAST_CP    126
-#define SLOT_MIDDOT (LAST_CP - FIRST_CP + 1)   /* « · » des rubriques */
-#define SLOTS      (SLOT_MIDDOT + 1)
-#define ATLAS_SIZE (1536 * 1024)
+/* Caractères rastérisés : ASCII, Latin-1 (accents du français), et quelques signes typographiques. */
+#define ASCII_FIRST  32
+#define ASCII_LAST   126
+#define LATIN1_FIRST 0xA0
+#define LATIN1_LAST  0xFF
+#define ASCII_SLOTS  (ASCII_LAST - ASCII_FIRST + 1)
+#define LATIN1_SLOTS (LATIN1_LAST - LATIN1_FIRST + 1)
+static const Uint32 EXTRA_CPS[] = { 0x2018, 0x2019, 0x201C, 0x201D, 0x2013, 0x2014, 0x2026 };   /* ‘ ’ “ ” – — … */
+#define EXTRA_SLOTS  ((int)SDL_arraysize(EXTRA_CPS))
+#define SLOTS        (ASCII_SLOTS + LATIN1_SLOTS + EXTRA_SLOTS)
+#define ATLAS_SIZE   (4 * 1024 * 1024)
 
 typedef struct Glyph {
     int   index;          /* glyphe dans la police */
@@ -33,16 +39,19 @@ typedef struct Glyph {
 } Glyph;
 
 static const char *const FILES[2] = { "assets/fonts/Junicode-Medium.ttf", "assets/fonts/Junicode-Bold.ttf" };
-static const struct { int file; float size; } SPECS[FONT_COUNT] = {
-    [FONT_TEXT]   = { 0, 22.0f },
-    [FONT_RUBRIC] = { 0, 13.0f },
-    [FONT_VERSAL] = { 1, 40.0f },
-    [FONT_CAP]    = { 1, 92.0f },
+/* lining : chiffres alignés (« 1012 ») au lieu des chiffres elzéviriens de Junicode (« ɪoɪ2 »), pour l'interface. */
+static const struct { int file; float size; bool lining; } SPECS[FONT_COUNT] = {
+    [FONT_TEXT]   = { 0, 22.0f, false },
+    [FONT_RUBRIC] = { 0, 13.0f, false },
+    [FONT_VERSAL] = { 1, 40.0f, false },
+    [FONT_CAP]    = { 1, 92.0f, false },
+    [FONT_TITLE]  = { 1, 60.0f, true },
+    [FONT_UI]     = { 0, 30.0f, true },
 };
 
 static void          *data[2];
 static stbtt_fontinfo info[2];
-static float          scale[FONT_COUNT], ascent[FONT_COUNT];
+static float          scale[FONT_COUNT], ascent[FONT_COUNT], descent[FONT_COUNT];
 static Glyph          glyphs[FONT_COUNT][SLOTS];
 static Uint8          atlas[ATLAS_SIZE];
 static Uint32         atlas_used;
@@ -76,14 +85,47 @@ static Uint32 next_cp(const char **s)
 
 static int slot_of(Uint32 cp)
 {
-    if (cp >= FIRST_CP && cp <= LAST_CP) return (int)(cp - FIRST_CP);
-    if (cp == 0xB7) return SLOT_MIDDOT;
-    return '?' - FIRST_CP;
+    if (cp >= ASCII_FIRST && cp <= ASCII_LAST) return (int)(cp - ASCII_FIRST);
+    if (cp >= LATIN1_FIRST && cp <= LATIN1_LAST) return ASCII_SLOTS + (int)(cp - LATIN1_FIRST);
+    for (int i = 0; i < EXTRA_SLOTS; i++) {
+        if (EXTRA_CPS[i] == cp) return ASCII_SLOTS + LATIN1_SLOTS + i;
+    }
+    return '?' - ASCII_FIRST;
 }
 
 static Uint32 slot_cp(int slot)
 {
-    return slot == SLOT_MIDDOT ? 0xB7u : (Uint32)(slot + FIRST_CP);
+    if (slot < ASCII_SLOTS) return (Uint32)(slot + ASCII_FIRST);
+    if (slot < ASCII_SLOTS + LATIN1_SLOTS) return (Uint32)(slot - ASCII_SLOTS + LATIN1_FIRST);
+    return EXTRA_CPS[slot - ASCII_SLOTS - LATIN1_SLOTS];
+}
+
+/*
+ * Glyphe nommé `name` dans la table `post` (format 2), 0 s'il n'existe pas.
+ * stb_truetype n'applique pas les fonctions OpenType : les chiffres alignés (« one.lf »)
+ * se retrouvent par leur nom.
+ */
+static int glyph_by_name(const stbtt_fontinfo *fi, const char *name)
+{
+    Uint8 *d = fi->data;
+    Uint32 post = stbtt__find_table(fi->data, (Uint32)fi->fontstart, "post");
+    if (!post || ttULONG(d + post) != 0x00020000u) return 0;
+    int count = ttUSHORT(d + post + 32);
+    Uint8 *index = d + post + 34;
+    const Uint8 *str = index + 2 * count;
+    size_t len = SDL_strlen(name);
+    /* rang du nom parmi les chaînes Pascal qui suivent (au plus une par glyphe) */
+    int rank = -1;
+    for (int k = 0; k < count && rank < 0; k++) {
+        int n = str[0];
+        if ((size_t)n == len && SDL_memcmp(str + 1, name, len) == 0) rank = k;
+        str += 1 + n;
+    }
+    if (rank < 0) return 0;
+    for (int gi = 0; gi < count; gi++) {
+        if (ttUSHORT(index + 2 * gi) == 258 + rank) return gi;
+    }
+    return 0;
 }
 
 bool font_init(void)
@@ -105,9 +147,17 @@ bool font_init(void)
         int asc, desc, gap;
         stbtt_GetFontVMetrics(fi, &asc, &desc, &gap);
         ascent[f] = (float)asc * scale[f];
+        descent[f] = (float)desc * scale[f];
         for (int s = 0; s < SLOTS; s++) {
             Glyph *g = &glyphs[f][s];
             g->index = stbtt_FindGlyphIndex(fi, (int)slot_cp(s));
+            Uint32 cp = slot_cp(s);
+            if (SPECS[f].lining && cp >= '0' && cp <= '9') {
+                static const char *const DIGITS[10] = { "zero.lf", "one.lf", "two.lf", "three.lf", "four.lf",
+                                                        "five.lf", "six.lf", "seven.lf", "eight.lf", "nine.lf" };
+                int lf = glyph_by_name(fi, DIGITS[cp - '0']);
+                if (lf > 0) g->index = lf;
+            }
             int adv, lsb, x1, y1;
             stbtt_GetGlyphHMetrics(fi, g->index, &adv, &lsb);
             g->advance = (float)adv * scale[f];
@@ -116,6 +166,7 @@ bool font_init(void)
             g->h = y1 - g->y0;
             Uint32 size = (Uint32)(g->w * g->h);
             if (g->w <= 0 || g->h <= 0 || atlas_used + size > ATLAS_SIZE) {
+                if (g->w > 0 && g->h > 0) SDL_Log("Atlas de la police plein : glyphe %u perdu", (unsigned)slot_cp(s));
                 g->w = g->h = 0;
                 continue;
             }
@@ -140,6 +191,16 @@ void font_quit(void)
 bool font_ready(void)
 {
     return ready;
+}
+
+float font_ascent(FontId f)
+{
+    return ready ? ascent[f] : 0.0f;
+}
+
+float font_line_height(FontId f)
+{
+    return ready ? ascent[f] - descent[f] : 0.0f;
 }
 
 float font_text_width(FontId f, const char *utf8)

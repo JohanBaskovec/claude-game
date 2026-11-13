@@ -80,6 +80,8 @@ Tuning tuning = {
     .shake_amplitude     = 6.0f,
     .trapdoor_radius     = 22.0f,
 
+    .era_title_time         = 3.5f,
+    .era_title_fade         = 0.7f,
     .item_banner_time       = 3.0f,
     .item_lully_damage      = 1.0f,
     .item_lully_foot_chance = 20,

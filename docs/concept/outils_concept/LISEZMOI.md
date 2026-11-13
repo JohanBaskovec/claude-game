@@ -1,4 +1,4 @@
-# Outils de concept — Fugue in Amadeus Minor
+# Outils de concept — Amadeus' Minor Fugue
 
 Scripts Python (Pillow + numpy) qui ont servi à produire les concepts. Ils servent de référence pour le portage en C.
 

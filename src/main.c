@@ -1,5 +1,5 @@
 /*
- * Fugue in Amadeus Minor — fenêtre, entrées, boucle de jeu.
+ * Amadeus' Minor Fugue — fenêtre, entrées, menu principal, boucle de jeu.
  * Les règles du jeu sont dans game.c.
  *
  * Modèle à callbacks de SDL3 (pas de boucle while bloquante),
@@ -16,9 +16,11 @@
 #include "decor.h"
 #include "game.h"
 #include "input.h"
+#include "menu.h"
 #include "minimap.h"
 #include "sprite.h"
 #include "text.h"
+#include "ui_text.h"
 
 #define TICK_NS       (SDL_NS_PER_SECOND / TICK_HZ)
 #define MAX_FRAME_NS  (SDL_NS_PER_SECOND / 4)   /* au-delà, on ralentit plutôt que d'enchaîner les pas */
@@ -29,6 +31,8 @@ typedef struct App {
 
     Game            game;
     DebugMenu       debug;
+    Menu            menu;
+    bool            in_menu;   /* menu principal affiché (au lancement) */
 
     Uint64          last_ns;
     Uint64          accumulator_ns;
@@ -59,6 +63,10 @@ static Uint64 random_seed(void)
 
 static void step(App *app, float dt)
 {
+    if (app->in_menu) {
+        menu_update(&app->menu, dt);
+        return;
+    }
     debug_menu_update(&app->debug, dt, &app->game.player.stats);
 
     Input in = input_sample();
@@ -73,6 +81,11 @@ static void render(App *app, float alpha)
 
     const Game *g = &app->game;
     game_render(g, r, alpha);
+    if (app->in_menu) {
+        menu_render(&app->menu, r);
+        SDL_RenderPresent(r);
+        return;
+    }
 
     if (app->show_debug) {
         SDL_SetRenderDrawColor(r, 255, 255, 255, 255);
@@ -110,7 +123,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     (void)argc;
     (void)argv;
 
-    SDL_SetAppMetadata("Fugue in Amadeus Minor", "0.1", "fr.baskovec.fugue");
+    SDL_SetAppMetadata("Amadeus' Minor Fugue", "0.1", "fr.baskovec.fugue");
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_Log("SDL_Init a échoué : %s", SDL_GetError());
@@ -124,7 +137,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     *appstate = app;
 
     int scale = initial_scale();
-    if (!SDL_CreateWindowAndRenderer("Fugue in Amadeus Minor", GAME_W * scale, GAME_H * scale,
+    if (!SDL_CreateWindowAndRenderer("Amadeus' Minor Fugue", GAME_W * scale, GAME_H * scale,
                                      SDL_WINDOW_RESIZABLE, &app->window, &app->renderer)) {
         SDL_Log("Création de la fenêtre impossible : %s", SDL_GetError());
         return SDL_APP_FAILURE;
@@ -132,7 +145,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     SDL_SetRenderLogicalPresentation(app->renderer, GAME_W, GAME_H,
                                      SDL_LOGICAL_PRESENTATION_INTEGER_SCALE);
     SDL_SetRenderVSync(app->renderer, 1);
-    SDL_HideCursor();   /* le jeu dessine son viseur (GDD §17) */
+    /* Le curseur du système sert au menu ; en partie, le jeu dessine son viseur (GDD §17). */
 
     SDL_srand(0);   /* graine aléatoire tirée de l'horloge */
     text_init_from_locale();
@@ -140,6 +153,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[])
     audio_init();
     game_init(&app->game, random_seed());
     debug_menu_init(&app->debug);
+    menu_init(&app->menu);
+    app->in_menu = true;
+    app->game.backdrop = true;   /* derrière le menu : la salle de départ */
 
     app->last_ns = SDL_GetTicksNS();
     app->fps_window_start = app->last_ns;
@@ -152,6 +168,31 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
 
     if (event->type == SDL_EVENT_QUIT) {
         return SDL_APP_SUCCESS;
+    }
+
+    /* Menu principal : il reçoit tous les événements (sauf F11), le jeu aucun. */
+    if (app->in_menu) {
+        if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_F11 && !event->key.repeat) {
+            bool fs = (SDL_GetWindowFlags(app->window) & SDL_WINDOW_FULLSCREEN) != 0;
+            SDL_SetWindowFullscreen(app->window, !fs);
+            return SDL_APP_CONTINUE;
+        }
+        SDL_Event local = *event;
+        SDL_ConvertEventToRenderCoordinates(app->renderer, &local);
+        switch (menu_handle_event(&app->menu, &local)) {
+        case MENU_PLAY:
+            app->in_menu = false;
+            app->game.backdrop = false;
+            game_new_run(&app->game, random_seed());
+            app->accumulator_ns = 0;
+            SDL_HideCursor();
+            break;
+        case MENU_QUIT:
+            return SDL_APP_SUCCESS;
+        default:
+            break;
+        }
+        return SDL_APP_CONTINUE;
     }
 
     if (event->type == SDL_EVENT_KEY_DOWN && !event->key.repeat) {
@@ -246,6 +287,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     (void)result;
     App *app = appstate;
     audio_quit();
+    ui_text_quit();
     decor_quit();
     sprite_quit();
     if (app) {

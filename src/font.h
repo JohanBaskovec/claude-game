@@ -5,7 +5,7 @@
 #include <stdbool.h>
 
 /*
- * Police du sol : Junicode (GDD §9, « Police du sol »), rendue avec stb_truetype.
+ * Police du sol et de l'interface : Junicode (GDD §9, « Police du sol »), rendue avec stb_truetype.
  * Les glyphes sont rastérisés une fois au chargement ; le texte est ensuite
  * écrit dans des tampons de couverture 8 bits (le décor les teinte en encre).
  */
@@ -14,6 +14,8 @@ typedef enum FontId {
     FONT_RUBRIC,   /* rubriques : Medium 13 px */
     FONT_VERSAL,   /* initiales de chant : Bold 40 px */
     FONT_CAP,      /* grande lettrine : Bold 92 px */
+    FONT_TITLE,    /* titres de l'interface (menu, époque) : Bold 60 px */
+    FONT_UI,       /* boutons de l'interface : Medium 30 px */
     FONT_COUNT
 } FontId;
 
@@ -21,6 +23,10 @@ typedef enum FontId {
 bool font_init(void);
 void font_quit(void);
 bool font_ready(void);
+
+/* Hauteur au-dessus de la ligne de base, et hauteur d'une ligne (ascendante + descendante), en px. */
+float font_ascent(FontId f);
+float font_line_height(FontId f);
 
 /* Largeur du texte UTF-8 (avances et crénage), en px. */
 float font_text_width(FontId f, const char *utf8);

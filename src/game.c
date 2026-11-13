@@ -198,6 +198,7 @@ static void start_floor(Game *g, Uint64 seed)
     enter_room(g, g->floor.start, cx, cy);
     g->transition.active = false;
     hud_init(&g->hud, &g->player.stats);
+    if (g->floor_number == 1) hud_show_era(&g->hud, text_get(TXT_ERA_1));   /* GDD §23 */
 }
 
 void game_new_run(Game *g, Uint64 seed)
@@ -1304,11 +1305,13 @@ void game_render(const Game *g, SDL_Renderer *r, float alpha)
         render_room_darkness(g, r, alpha, cam);
     }
 
-    hud_render(&g->hud, r, &g->player.stats);
-    const Enemy *boss = enemy_find_boss(&g->enemies);
-    if (boss && !t->active) hud_render_boss(r, boss->hp, boss->max_hp);
-    int hover = game_can_teleport(g, g->map_hover) ? g->map_hover : -1;
-    minimap_render(&g->floor, g->room.index, r, g->reveal_map, hover);
+    if (!g->backdrop) {
+        hud_render(&g->hud, r, &g->player.stats);
+        const Enemy *boss = enemy_find_boss(&g->enemies);
+        if (boss && !t->active) hud_render_boss(r, boss->hp, boss->max_hp);
+        int hover = game_can_teleport(g, g->map_hover) ? g->map_hover : -1;
+        minimap_render(&g->floor, g->room.index, r, g->reveal_map, hover);
+    }
 
     /* Hors des glissements, on dessine à l'avance une salle voisine par image. */
     if (!t->active) decor_prefetch(&g->floor, g->room.index, r);

@@ -2,6 +2,7 @@
 #include "sprite.h"
 #include "config.h"
 #include "draw.h"
+#include "ui_text.h"
 #include "weapon.h"
 
 #include <math.h>
@@ -17,11 +18,21 @@
 #define COUNT_Y     76.0f
 #define COUNT_STEP  22.0f
 
+static void render_era(const Hud *hud, SDL_Renderer *r);
+
 void hud_init(Hud *hud, const PlayerStats *stats)
 {
     hud->shown_hp = (float)stats->hp;
     hud->banner_title = hud->banner_text = NULL;
     hud->banner_timer = 0.0f;
+    hud->era_title = NULL;
+    hud->era_age = 0.0f;
+}
+
+void hud_show_era(Hud *hud, const char *title)
+{
+    hud->era_title = title;
+    hud->era_age = 0.0f;
 }
 
 void hud_show_banner(Hud *hud, const char *title, const char *text)
@@ -34,6 +45,10 @@ void hud_show_banner(Hud *hud, const char *title, const char *text)
 void hud_update(Hud *hud, const PlayerStats *stats, float dt)
 {
     if (hud->banner_timer > 0.0f) hud->banner_timer -= dt;
+    if (hud->era_title) {
+        hud->era_age += dt;
+        if (hud->era_age >= tuning.era_title_time) hud->era_title = NULL;
+    }
     float hp = (float)stats->hp;
     if (hud->shown_hp <= hp) {
         hud->shown_hp = hp;   /* un soin s'affiche tout de suite */
@@ -132,6 +147,42 @@ void hud_render(const Hud *hud, SDL_Renderer *r, const PlayerStats *stats)
                             (SDL_Color){ 236, 226, 204, (Uint8)(255 * a) });
         }
     }
+
+    render_era(hud, r);
+}
+
+/* Titre d'époque : lettres d'or sur une bande sombre aux bords fondus, filets de part et d'autre. */
+static void render_era(const Hud *hud, SDL_Renderer *r)
+{
+    if (!hud->era_title) return;
+    float t = hud->era_age, fade = SDL_max(tuning.era_title_fade, 0.01f);
+    float a = SDL_min(SDL_min(t / fade, (tuning.era_title_time - t) / fade), 1.0f);
+    if (a <= 0.0f) return;
+    float ease = a * a * (3.0f - 2.0f * a);
+
+    const float cy = 188.0f;   /* sous les compteurs du HUD, au-dessus d'Amadeus au départ */
+    float lh = font_line_height(FONT_TITLE);
+    /* bande : plus opaque au milieu, fondue en haut et en bas */
+    for (int i = 0; i < 12; i++) {
+        float k = 1.0f - (float)i / 12.0f, half = lh * 0.5f + 4.0f + (float)i * 3.0f;
+        draw_rect(r, 0, cy - half, GAME_W, 3.0f, (SDL_Color){ 14, 10, 10, (Uint8)(150 * k * ease) });
+        draw_rect(r, 0, cy + half - 3.0f, GAME_W, 3.0f, (SDL_Color){ 14, 10, 10, (Uint8)(150 * k * ease) });
+    }
+    draw_rect(r, 0, cy - lh * 0.5f - 1.0f, GAME_W, lh + 2.0f, (SDL_Color){ 14, 10, 10, (Uint8)(150 * ease) });
+
+    float w = ui_text_width(FONT_TITLE, hud->era_title);
+    float rise = (1.0f - ease) * 6.0f;   /* monte un peu en apparaissant */
+    float top = cy - lh * 0.5f + rise;
+    ui_text_draw(r, FONT_TITLE, hud->era_title, GAME_W * 0.5f + 2.0f, top + 2.0f, 0.5f, (SDL_Color){ 0, 0, 0, (Uint8)(160 * ease) });
+    ui_text_draw(r, FONT_TITLE, hud->era_title, GAME_W * 0.5f, top, 0.5f, (SDL_Color){ 240, 200, 100, (Uint8)(255 * ease) });
+
+    /* filets d'or qui s'allongent depuis le titre */
+    float len = 120.0f * ease, gap = 22.0f, ly = cy + rise + 2.0f;
+    SDL_Color gold = { 210, 168, 80, (Uint8)(220 * ease) };
+    draw_rect(r, GAME_W * 0.5f - w * 0.5f - gap - len, ly, len, 2.0f, gold);
+    draw_rect(r, GAME_W * 0.5f + w * 0.5f + gap, ly, len, 2.0f, gold);
+    draw_ellipse(r, GAME_W * 0.5f - w * 0.5f - gap * 0.5f, ly + 1.0f, 3.0f, 3.0f, gold);
+    draw_ellipse(r, GAME_W * 0.5f + w * 0.5f + gap * 0.5f, ly + 1.0f, 3.0f, 3.0f, gold);
 }
 
 void hud_render_boss(SDL_Renderer *r, float hp, float max_hp)

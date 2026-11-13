@@ -15,6 +15,8 @@ typedef struct Hud {
     const char *banner_title;  /* bandeau (objet ramassé) : nom ... */
     const char *banner_text;   /* ... et effet */
     float       banner_timer;  /* > 0 : bandeau affiché */
+    const char *era_title;     /* titre d'époque (arrivée au premier étage, GDD §23) */
+    float       era_age;       /* temps depuis son apparition, s */
 } Hud;
 
 void hud_init(Hud *hud, const PlayerStats *stats);
@@ -22,6 +24,9 @@ void hud_update(Hud *hud, const PlayerStats *stats, float dt);
 
 /* Affiche un bandeau au milieu de l'écran pendant tuning.item_banner_time. */
 void hud_show_banner(Hud *hud, const char *title, const char *text);
+
+/* Titre d'époque : apparaît en fondu, reste, puis disparaît (tuning.era_title_time). */
+void hud_show_era(Hud *hud, const char *title);
 
 /* Barre de vie, métronomes, royalties et bandeau. */
 void hud_render(const Hud *hud, SDL_Renderer *renderer, const PlayerStats *stats);

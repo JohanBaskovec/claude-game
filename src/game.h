@@ -58,6 +58,7 @@ typedef struct Game {
     /* Affichage de la mini-carte, réglé par la fenêtre (souris, menu de debug). */
     bool           reveal_map; /* toute la carte visible et téléportation partout (debug) */
     int            map_hover;  /* salle survolée sur la mini-carte, -1 si aucune */
+    bool           backdrop;   /* fond du menu principal : la salle seule, sans HUD ni mini-carte */
 } Game;
 
 /* Initialise le jeu et commence une partie. */

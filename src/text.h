@@ -45,6 +45,10 @@ typedef enum TextId {
     TXT_WEAPON_ORGAN_DESC,
     TXT_SHOP_HEAL_NAME,
     TXT_SHOP_HEAL_DESC,
+    TXT_GAME_TITLE,
+    TXT_MENU_PLAY,
+    TXT_MENU_QUIT,
+    TXT_ERA_1,
     TXT_COUNT
 } TextId;
 

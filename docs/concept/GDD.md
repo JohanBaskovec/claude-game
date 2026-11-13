@@ -1,9 +1,9 @@
-# FUGUE IN AMADEUS MINOR — Game Design Document (brouillon)
+# AMADEUS' MINOR FUGUE — Game Design Document (brouillon)
 
 > Document de travail destiné à Claude Code. Il décrit l'univers et les choix de design.
 > **Statut : en cours de conception.** Les sections marquées ✅ sont décidées, 💡 sont des idées à valider, ❓ sont des questions ouvertes.
 > **Source de vérité du design : ce fichier, dans le dépôt** (`docs/concept/GDD.md`). La conception se fait désormais uniquement avec Claude Code, qui le met à jour au fil des décisions prises avec Johan.
-> **Phase en cours : aucune (Phase 13 terminée).** Les Phases 1 à 13 (sections 10 à 22) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
+> **Phase en cours : aucune (Phase 14 terminée).** Les Phases 1 à 14 (sections 10 à 23) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
 
 ---
 
@@ -17,12 +17,13 @@ Un roguelike en 2D vue de dessus, dans la lignée de *The Binding of Isaac* : on
 
 ## 2. Titre
 
-✅ **Fugue in Amadeus Minor** (FR : *Fugue en Amadeus mineur*).
+✅ **Amadeus' Minor Fugue** (écrit avec l'apostrophe typographique à l'écran : *Amadeus’ Minor Fugue*). Ancien titre de travail : *Fugue in Amadeus Minor*.
 
 - **« Fugue »** a un double sens : une forme musicale ET la fuite de l'enfant.
-- Le titre parodie les titres d'œuvres classiques (« Fugue en sol mineur »).
-- **« mineur / minor »** désigne à la fois la tonalité et un enfant : le titre se lit aussi « la fuite d'Amadeus, mineur ». Le double sens marche en français et en anglais.
-- Une recherche web n'a trouvé aucun jeu sous ce nom, seulement de vraies fugues de Mozart.
+- **« Minor Fugue »** se lit « fugue en mineur » (la tonalité) et « fugue de mineur » (la fuite d'un enfant) ; **« Amadeus' »** : c'est la fugue d'Amadeus, comme on dit « la petite fugue de Bach ».
+- Le titre parodie les titres d'œuvres classiques (« Little Fugue in G minor »).
+- ❓ **Titre français** : pour l'instant le titre anglais est affiché dans les deux langues. (Une traduction comme *La Fugue mineure d'Amadeus* garderait le double sens.)
+- ❓ Pas encore vérifié qu'aucun jeu ne porte déjà ce nom (la recherche avait été faite pour l'ancien titre).
 
 ## 3. Histoire ✅
 
@@ -128,7 +129,7 @@ Concept visuel ✅ (planche de Johan, `assets/sprites/baby/baby.png`, cases de 2
 
 ## 5. Équivalences avec TBOI
 
-| TBOI | Fugue in Amadeus Minor | Statut | Notes |
+| TBOI | Amadeus' Minor Fugue | Statut | Notes |
 |---|---|---|---|
 | Clés | **Clés** (de sol, de fa, d'ut) | ✅ | 3 types de clés, donc **3 types de portes**. En anglais, *clef* et *key* marchent aussi (*key* = tonalité). |
 | Bombes | **Métronome** | ✅ | Fait tic-tac en accélérant, puis explose. |
@@ -859,3 +860,25 @@ Plans de salles faits à la main, salles secrètes, sons des obstacles, autres �
 
 ### Hors périmètre (ne pas faire)
 Usage de la clef d'ut, vendeur dessiné dans le magasin, autres choses en vente (clefs, métronomes), salles secrètes, Tartini, Hildegard.
+
+## 23. PHASE 14 — Menu principal et titre d'époque ✅ terminée
+
+**But** : le jeu s'ouvre sur un vrai menu, et l'arrivée au premier étage annonce l'époque.
+
+### Nouveau titre ✅
+- Le jeu s'appelle **Amadeus' Minor Fugue** (section 2) : titre de la fenêtre, menu principal, documents.
+
+### Menu principal ✅
+- Au lancement, le jeu s'ouvre sur le **menu principal** : le titre *Amadeus’ Minor Fugue* en grand, et deux boutons, **Jouer** et **Quitter**.
+- Derrière : la salle de départ, assombrie (sans HUD ni mini-carte).
+- Souris (survol, clic) et clavier (haut / bas ou Z / S, Entrée ou Espace ; Échap quitte).
+- **Jouer** lance une nouvelle partie. **Quitter** ferme le jeu ; dans le navigateur on ne peut pas fermer l'onglet, donc pas de bouton Quitter.
+- Les textes passent par la police Junicode du décor (enfin avec les accents).
+
+### Titre d'époque ✅
+- En arrivant au **premier étage** (à chaque nouvelle partie, y compris après une mort), un titre s'affiche : **« 1012 après J.-C. »** (EN : *AD 1012*).
+- Il apparaît en fondu, reste environ 3 s, puis disparaît, sans arrêter le jeu (on peut déjà bouger, comme le nom de l'étage dans TBOI).
+- Les étages suivants n'ont pas encore de titre (leurs époques ne sont pas décidées en détail, section 8).
+
+### Hors périmètre (ne pas faire)
+Menu pause, options (volume, langue, touches), écran de mort, cinématique d'intro, titres des autres étages, Échap pendant la partie (il quitte toujours le jeu sur ordinateur).

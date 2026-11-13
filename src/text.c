@@ -41,6 +41,10 @@ static const char *const TEXTS[TXT_COUNT][LANG_COUNT] = {
     [TXT_WEAPON_ORGAN_DESC]     = { "Un accord qui traverse tout... et cloue sur place", "A chord that pierces all... and roots you" },
     [TXT_SHOP_HEAL_NAME]        = { "Soin", "Healing" },
     [TXT_SHOP_HEAL_DESC]        = { "+%d PV", "+%d HP" },   /* tuning.shop_heal */
+    [TXT_GAME_TITLE]            = { "Amadeus’ Minor Fugue", "Amadeus’ Minor Fugue" },   /* titre français : GDD §2 ❓ */
+    [TXT_MENU_PLAY]             = { "Jouer", "Play" },
+    [TXT_MENU_QUIT]             = { "Quitter", "Quit" },
+    [TXT_ERA_1]                 = { "1012 après J.-C.", "AD 1012" },   /* titre d'époque du premier étage (GDD §23) */
 };
 
 void text_init_from_locale(void)

@@ -64,6 +64,8 @@ add_executable(fugue
     src/splatter.c
     src/sprite.c
     src/text.c
+    src/ui_text.c
+    src/menu.c
     src/weapon.c
 )
 
