@@ -54,7 +54,7 @@ static float            last_sing = -1e9f;
 static Uint64           rng = 0x9E3779B97F4A7C15ull;
 
 /* Bruitages : tous rangés à la suite dans une seule réserve. */
-#define SOUND_BANK_SAMPLES (AUDIO_RATE * 9)
+#define SOUND_BANK_SAMPLES (AUDIO_RATE * 14)
 #define MAX_SOUND_SAMPLES  (AUDIO_RATE * 2)
 static Sint16 sound_bank[SOUND_BANK_SAMPLES];
 static int    sound_bank_used;
@@ -481,6 +481,57 @@ static void add_gasp(float start, float dur, float amp)
 }
 
 /* Pleurs de bébé : un long « ouiiin », ou un sanglot « oua… ouaaah ». */
+/* Une lame de boîte à musique pincée : fondamentale qui dure, partiel aigu de lame vibrante
+ * (rapport 6,27) qui s'éteint vite, une copie à peine désaccordée qui chatoie, et le petit clic du picot. */
+static void add_tine(float start, float freq, float amp, float length)
+{
+    add_partial(start, freq, amp, length);
+    add_partial(start, freq * 1.0035f, amp * 0.35f, length * 0.8f);
+    add_partial(start, freq * 6.27f, amp * 0.22f, 0.04f);
+    add_noise(start, amp * 0.12f, 0.0012f, 0.9f);
+}
+
+/* Boîtes à musique (GDD §22) : grise, le début d'Ut queant laxis ; dorée, ut ré mi fa sol la, puis un accord. */
+static void make_music_boxes(void)
+{
+    const float DO6 = 1046.5f;
+    sfx_begin(71);
+    static const int UT_QUEANT[6] = { 0, 2, 5, 2, 4, 2 };   /* ut que-ant la-xis, en demi-tons */
+    for (int i = 0; i < 6; i++) {
+        add_tine(0.16f * (float)i, DO6 * powf(2.0f, (float)UT_QUEANT[i] / 12.0f), 1.0f, i == 5 ? 0.9f : 0.5f);
+    }
+    store_sound(SOUND_BOX_GRAY, 1.9f);
+
+    sfx_begin(72);
+    static const int HEXACHORD[6] = { 0, 2, 4, 5, 7, 9 };   /* ut ré mi fa sol la */
+    for (int i = 0; i < 6; i++) add_tine(0.12f * (float)i, DO6 * powf(2.0f, (float)HEXACHORD[i] / 12.0f), 1.0f, 0.45f);
+    static const int CHORD[3] = { 12, 16, 19 };             /* ut mi sol, une octave plus haut */
+    for (int i = 0; i < 3; i++) add_tine(0.80f + 0.03f * (float)i, DO6 * powf(2.0f, (float)CHORD[i] / 12.0f), 0.8f, 1.0f);
+    store_sound(SOUND_BOX_GOLD, 2.0f);
+}
+
+/* Clef ramassée : deux petites clefs de métal qui s'entrechoquent. Serrure : pêne qui claque. */
+static void make_keys(void)
+{
+    sfx_begin(81);
+    const float ratio[4] = { 1.0f, 1.47f, 2.09f, 2.71f };
+    for (int hit = 0; hit < 2; hit++) {
+        float start = 0.085f * (float)hit, base = hit ? 3400.0f : 2900.0f;
+        for (int i = 0; i < 4; i++) add_partial(start, base * ratio[i], 0.8f / (1.0f + (float)i), 0.09f / (1.0f + 0.5f * (float)i));
+        add_noise(start, 0.2f, 0.001f, 0.9f);
+    }
+    store_sound(SOUND_KEY, 0.3f);
+
+    sfx_begin(82);
+    add_thump(0.0f, 900.0f, 260.0f, 0.01f, 0.9f, 0.03f);
+    add_noise(0.0f, 0.6f, 0.004f, 0.6f);
+    add_partial(0.0f, 1850.0f, 0.4f, 0.03f);
+    add_thump(0.11f, 700.0f, 180.0f, 0.012f, 1.0f, 0.05f);   /* le pêne retombe */
+    add_noise(0.11f, 0.7f, 0.006f, 0.45f);
+    add_partial(0.11f, 1420.0f, 0.35f, 0.05f);
+    store_sound(SOUND_UNLOCK, 0.3f);
+}
+
 static void make_baby(void)
 {
     sfx_begin(97);
@@ -518,6 +569,8 @@ bool audio_init(void)
     make_bell();
     make_dig();
     make_baby();
+    make_music_boxes();
+    make_keys();
     chant = 0;   /* on commence par Ut queant laxis, écrit sur le sol */
     next_syllable = 0;
     last_sing = -1e9f;

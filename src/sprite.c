@@ -19,6 +19,7 @@ typedef enum SheetId {
     SHEET_RINGER,
     SHEET_BELL,
     SHEET_OBSTACLES,
+    SHEET_PICKUPS,
     SHEET_COUNT
 } SheetId;
 
@@ -39,6 +40,9 @@ static const struct { const char *file; int cell_w, cell_h; } SHEETS[SHEET_COUNT
     /* Obstacles de la phase 12 (planche provisoire) : une case = une case du sol (48 px de large),
      * le centre de la case au sol est à 8 px du bas. */
     [SHEET_OBSTACLES] = { "assets/sprites/obstacles/obstacles.png", 48, 64 },
+    /* Clefs et boîtes à musique de la phase 13 (planche provisoire) : objets centrés dans leur case,
+     * le bas des boîtes à 4 px du bas de la case. */
+    [SHEET_PICKUPS]   = { "assets/sprites/pickups/pickups.png", 48, 48 },
 };
 
 typedef struct SpriteDef {
@@ -99,6 +103,16 @@ static const SpriteDef DEFS[SPR_COUNT] = {
     [SPR_NEEDLES_IN]      = DEF_PNG(SHEET_OBSTACLES, 5),
     [SPR_NEEDLES_TIPS]    = DEF_PNG(SHEET_OBSTACLES, 6),
     [SPR_NEEDLES_OUT]     = DEF_PNG(SHEET_OBSTACLES, 7),
+    [SPR_KEY_SOL]         = DEF_PNG(SHEET_PICKUPS, 0),
+    [SPR_KEY_FA]          = DEF_PNG(SHEET_PICKUPS, 1),
+    [SPR_KEY_UT]          = DEF_PNG(SHEET_PICKUPS, 2),
+    [SPR_BOX_GRAY]        = DEF_PNG(SHEET_PICKUPS, 3),
+    [SPR_BOX_GRAY_OPEN]   = DEF_PNG(SHEET_PICKUPS, 4),
+    [SPR_BOX_GOLD]        = DEF_PNG(SHEET_PICKUPS, 5),
+    [SPR_BOX_GOLD_OPEN]   = DEF_PNG(SHEET_PICKUPS, 6),
+    [SPR_KEY_SOL_SMALL]   = DEF_PNG(SHEET_PICKUPS, 7),
+    [SPR_KEY_FA_SMALL]    = DEF_PNG(SHEET_PICKUPS, 8),
+    [SPR_KEY_UT_SMALL]    = DEF_PNG(SHEET_PICKUPS, 9),
 };
 
 #define MAX_SPRITE_PIXELS (64 * 64)

@@ -21,6 +21,7 @@
 #define ROOM_MAX_DOORS 8
 #define TREASURE_OFFERS 3   /* objets au choix dans la salle du trésor */
 #define ROOM_MAX_SPAWNS 16  /* ennemis d'une salle */
+#define ROOM_MAX_BOXES 6    /* boîtes à musique d'une salle */
 
 typedef enum RoomShape {
     SHAPE_1x1,
@@ -39,7 +40,17 @@ typedef enum RoomKind {
     ROOM_START,
     ROOM_BOSS,
     ROOM_TREASURE,
+    ROOM_SHOP,       /* le Luthier (GDD §22) */
 } RoomKind;
+
+/* Boîte à musique (GDD §22), rangée dans sa salle : elle y reste tant qu'on ne l'a pas ouverte. */
+typedef struct MusicBox {
+    float x, y;      /* centre au sol, coordonnées page */
+    bool  golden;    /* dorée : il faut une clef de fa */
+    bool  open;
+    int   item;      /* ouverte : objet posé dedans (ItemId), -1 si aucun */
+    bool  touched;   /* le joueur la touche encore depuis l'ouverture : l'objet se prend au contact suivant */
+} MusicBox;
 
 /* Porte : sur le côté `side` de la cellule (cell_x, cell_y), vers la salle `target`. */
 typedef struct FloorDoor {
@@ -63,6 +74,11 @@ typedef struct FloorRoom {
     int       offers[TREASURE_OFFERS]; /* trésor et boss : objet sur chaque lutrin (ItemId), -1 si aucun.
                                           Rempli par le jeu, qui sait quels objets sont déjà pris. */
     int       weapon_offer;            /* trésor et boss : arme sur le socle (WeaponId), -1 si aucune */
+    bool      locked;                  /* portes fermées à clef (magasin : clef de sol) */
+    int       lock_key;                /* KeyKind qui ouvre */
+    bool      heal_sold;               /* magasin : le soin a été acheté */
+    int       box_count;
+    MusicBox  boxes[ROOM_MAX_BOXES];
     RoomLayout layout;                 /* trous et obstacles (GDD §21), modifiés en jeu */
 } FloorRoom;
 
@@ -74,6 +90,7 @@ typedef struct Floor {
     int       start;
     int       boss;
     int       treasure;       /* -1 si aucune */
+    int       shop;           /* -1 si aucun */
 } Floor;
 
 /* Génère un étage. Même graine = même étage. */

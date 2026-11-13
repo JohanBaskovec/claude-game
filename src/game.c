@@ -2,8 +2,11 @@
 #include "audio.h"
 #include "config.h"
 #include "decor.h"
+#include "draw.h"
 #include "minimap.h"
 #include "obstacle.h"
+#include "sprite.h"
+#include "text.h"
 
 #include <math.h>
 
@@ -95,9 +98,18 @@ static void free_player_from_props(Game *g)
 static void collect(Game *g, PickupType type)
 {
     PlayerStats *st = &g->player.stats;
-    if (type == PICKUP_BOMB) st->bombs = SDL_min(st->bombs + 1, 99);
-    else                     st->coins = SDL_min(st->coins + 1, 99);
+    switch (type) {
+    case PICKUP_BOMB: st->bombs = SDL_min(st->bombs + 1, 99); break;
+    case PICKUP_COIN: st->coins = SDL_min(st->coins + 1, 99); break;
+    default: {
+        int k = type - PICKUP_KEY_SOL;
+        st->keys[k] = SDL_min(st->keys[k] + 1, 99);
+        break;
+    }
+    }
 }
+
+static void room_cleared(Game *g);
 
 /* Entre dans une salle : construit sa géométrie, place le joueur, fait apparaître
  * les ennemis à la première visite et ferme les portes s'il y en a. */
@@ -135,8 +147,11 @@ static void enter_room(Game *g, int index, float entry_x, float entry_y)
         }
     }
     bool empty = enemy_count(&g->enemies) == 0;
-    if (empty) fr->cleared = true;
     room_set_doors_open(&g->room, empty, &g->player.box);
+    if (empty && !fr->cleared) {
+        fr->cleared = true;
+        if (fr->kind == ROOM_NORMAL) room_cleared(g);   /* salle normale sans ennemis : récompense quand même */
+    }
 }
 
 /* Tire `n` valeurs différentes dans pool[0..*count[ et les retire du tas. -1 quand il est vide. */
@@ -162,12 +177,12 @@ static void fill_offers(Game *g)
     for (int w = 0; w < WEAPON_COUNT; w++) {
         if (w != WEAPON_VOICE && w != g->player.stats.weapon) weapons[nw++] = w;
     }
-    int rooms[2] = { g->floor.treasure, g->floor.boss };
-    for (int k = 0; k < 2; k++) {
+    int rooms[3] = { g->floor.treasure, g->floor.boss, g->floor.shop };
+    for (int k = 0; k < 3; k++) {
         if (rooms[k] < 0) continue;
         FloorRoom *fr = &g->floor.rooms[rooms[k]];
         for (int i = 0; i < TREASURE_OFFERS; i++) fr->offers[i] = draw_from(items, &ni, &rng);
-        fr->weapon_offer = draw_from(weapons, &nw, &rng);
+        if (fr->kind != ROOM_SHOP) fr->weapon_offer = draw_from(weapons, &nw, &rng);   /* pas d'arme au magasin */
     }
 }
 
@@ -243,17 +258,88 @@ static void start_transition(Game *g, const RoomDoor *door)
     enter_room(g, door->target, ex, ey);
 }
 
+/* Salle pas encore visitée, mais reliée à une salle visitée (et pas fermée à clef) : sombre sur la mini-carte. */
+static bool reachable_unvisited(const Game *g, int room)
+{
+    const FloorRoom *fr = &g->floor.rooms[room];
+    if (fr->visited || fr->locked) return false;
+    for (int k = 0; k < fr->door_count; k++) {
+        int t = fr->doors[k].target;
+        if (t >= 0 && g->floor.rooms[t].visited) return true;
+    }
+    return false;
+}
+
 bool game_can_teleport(const Game *g, int room)
 {
     if (room < 0 || room >= g->floor.room_count || g->transition.active) return false;
     if (g->reveal_map) return true;
-    return g->floor.rooms[room].visited && enemy_count(&g->enemies) == 0;
+    if (enemy_count(&g->enemies) > 0) return false;
+    return g->floor.rooms[room].visited || reachable_unvisited(g, room);
+}
+
+/* Entrée dans une salle pas encore visitée « comme si on y avait marché par le plus court chemin »
+ * (GDD §22) : le chemin part de la salle courante et passe par les salles visitées (l'étage est un
+ * arbre, il est unique) ; on arrive par la porte de la dernière salle visitée la plus proche de
+ * l'endroit où le chemin entre dans celle-ci. */
+static bool walked_entry(const Game *g, int target, float *ex, float *ey)
+{
+    const Floor *f = &g->floor;
+    int parent[FLOOR_MAX_ROOMS], queue[FLOOR_MAX_ROOMS], head = 0, tail = 0;
+    for (int i = 0; i < f->room_count; i++) parent[i] = -2;
+    parent[g->room.index] = -1;
+    queue[tail++] = g->room.index;
+    while (head < tail) {
+        int r = queue[head++];
+        const FloorRoom *fr = &f->rooms[r];
+        for (int k = 0; k < fr->door_count; k++) {
+            int t = fr->doors[k].target;
+            if (t < 0 || parent[t] != -2 || f->rooms[t].locked) continue;
+            if (!f->rooms[t].visited && t != target) continue;
+            parent[t] = r;
+            if (t != target) queue[tail++] = t;
+        }
+    }
+    int from = target >= 0 ? parent[target] : -2;
+    if (from < 0) return false;
+
+    /* Point par lequel on arrive dans la salle `from`. */
+    static Room near, dest;
+    room_build(&near, f, from);
+    float ax, ay;
+    if (from == g->room.index) {
+        player_center(&g->player, &ax, &ay);
+    } else {
+        room_center(&near, &ax, &ay);
+        for (int k = 0; k < near.door_count; k++) {
+            if (near.doors[k].target == parent[from]) { ax = near.doors[k].entry_x; ay = near.doors[k].entry_y; break; }
+        }
+    }
+    /* Porte de `from` vers la cible la plus proche, puis la porte d'en face dans la cible. */
+    const RoomDoor *best = NULL;
+    float best_d = 1e30f;
+    for (int k = 0; k < near.door_count; k++) {
+        const RoomDoor *d = &near.doors[k];
+        if (d->target != target) continue;
+        float dd = (d->entry_x - ax) * (d->entry_x - ax) + (d->entry_y - ay) * (d->entry_y - ay);
+        if (dd < best_d) { best_d = dd; best = d; }
+    }
+    if (!best) return false;
+    float dx, dy;
+    dir_vector(best->side, &dx, &dy);
+    room_build(&dest, f, target);
+    const RoomDoor *entry = room_find_door(&dest, best->cell_x + (int)dx, best->cell_y + (int)dy, opposite(best->side));
+    if (!entry) return false;
+    *ex = entry->entry_x;
+    *ey = entry->entry_y;
+    return true;
 }
 
 bool game_teleport(Game *g, int room, int cx, int cy)
 {
     if (!game_can_teleport(g, room) || floor_room_at(&g->floor, cx, cy) != room) return false;
     float x = (cx + 0.5f) * CELL_W, y = (cy + 0.5f) * CELL_H;
+    if (reachable_unvisited(g, room)) walked_entry(g, room, &x, &y);   /* sinon (debug) : au centre de la cellule */
     g->player.vx = g->player.vy = 0.0f;
     enter_room(g, room, x, y);
     return true;
@@ -618,12 +704,158 @@ static void resolve_offers(Game *g)
                 take_weapon(g, fr);
                 g->socle_armed = false;
             }
+        } else if (g->room.prop_kind[i] == PROP_HEAL) {
+            /* Magasin : le soin, s'il reste à vendre, si on peut payer et si la vie n'est pas pleine. */
+            PlayerStats *st = &g->player.stats;
+            if (!fr->heal_sold && st->coins >= tuning.shop_price && st->hp < st->max_hp) {
+                st->coins -= tuning.shop_price;
+                st->hp = SDL_min(st->hp + tuning.shop_heal, st->max_hp);
+                fr->heal_sold = true;
+                SDL_snprintf(g->heal_text, sizeof g->heal_text, text_get(TXT_SHOP_HEAL_DESC), tuning.shop_heal);
+                hud_show_banner(&g->hud, text_get(TXT_SHOP_HEAL_NAME), g->heal_text);
+                audio_play(SOUND_PICKUP_COIN, 0.8f);
+            }
         } else if (i < TREASURE_OFFERS && fr->offers[i] >= 0) {
+            if (fr->kind == ROOM_SHOP) {
+                /* Magasin : on paie, l'objet acheté disparaît, les autres restent. */
+                if (g->player.stats.coins < tuning.shop_price) continue;
+                g->player.stats.coins -= tuning.shop_price;
+                take_item(g, (ItemId)fr->offers[i]);
+                fr->offers[i] = ITEM_NONE;
+                audio_play(SOUND_PICKUP_COIN, 0.8f);
+                continue;
+            }
             take_item(g, (ItemId)fr->offers[i]);
             for (int k = 0; k < TREASURE_OFFERS; k++) fr->offers[k] = ITEM_NONE;
         }
     }
     if (!on_socle) g->socle_armed = true;
+}
+
+/* ------------------------------------------------------------ boîtes à musique (GDD §22) */
+
+static SDL_FRect box_rect(const MusicBox *b)
+{
+    return (SDL_FRect){ b->x - 18.0f, b->y - 14.0f, 36.0f, 16.0f };
+}
+
+static void add_box(Game *g, float x, float y, bool golden)
+{
+    FloorRoom *fr = &g->floor.rooms[g->room.index];
+    if (fr->box_count >= ROOM_MAX_BOXES) return;
+    fr->boxes[fr->box_count++] = (MusicBox){ x, y, golden, false, -1, false };
+    g->box_cooldown = 0.5f;
+}
+
+void game_spawn_box(Game *g)
+{
+    float px, py;
+    player_center(&g->player, &px, &py);
+    float x = px + 90.0f, y = py;
+    room_find_free_point(&g->room, 40.0f, 20.0f, &x, &y);
+    add_box(g, x, y, SDL_rand(2) == 0);
+}
+
+static int weighted_pick(const int *weight, int n)
+{
+    int total = 0;
+    for (int i = 0; i < n; i++) total += SDL_max(weight[i], 0);
+    if (total <= 0) return 0;
+    int r = SDL_rand(total);
+    for (int i = 0; i < n; i++) {
+        if (r < SDL_max(weight[i], 0)) return i;
+        r -= SDL_max(weight[i], 0);
+    }
+    return 0;
+}
+
+/* Objet rare d'une boîte dorée : pas encore pris, et proposé nulle part ailleurs sur l'étage. */
+static int pick_box_item(const Game *g)
+{
+    int pool[ITEM_COUNT], n = 0;
+    for (int i = 0; i < ITEM_COUNT; i++) {
+        bool taken = g->owned[i];
+        for (int r = 0; r < g->floor.room_count && !taken; r++) {
+            const FloorRoom *fr = &g->floor.rooms[r];
+            for (int k = 0; k < TREASURE_OFFERS; k++) taken |= fr->offers[k] == i;
+            for (int k = 0; k < fr->box_count; k++) taken |= fr->boxes[k].item == i;
+        }
+        if (!taken) pool[n++] = i;
+    }
+    return n > 0 ? pool[SDL_rand(n)] : -1;
+}
+
+/* La boîte s'ouvre : mélodie, et son contenu se répand autour. */
+static void open_box(Game *g, MusicBox *b)
+{
+    b->open = true;
+    audio_play(b->golden ? SOUND_BOX_GOLD : SOUND_BOX_GRAY, 1.0f);
+    if (b->golden && SDL_randf() < tuning.box_gold_item_chance) {
+        b->item = pick_box_item(g);
+        if (b->item >= 0) return;
+    }
+    int lo = b->golden ? tuning.box_gold_min : tuning.box_gray_min;
+    int hi = b->golden ? tuning.box_gold_max : tuning.box_gray_max;
+    int n = lo + SDL_rand(SDL_max(hi - lo + 1, 1));
+    for (int i = 0; i < n; i++) {
+        int c = weighted_pick(tuning.box_content_weight, 3);
+        PickupType type = c == 0 ? PICKUP_COIN : c == 1 ? PICKUP_BOMB : (PickupType)(PICKUP_KEY_SOL + SDL_rand(KEY_COUNT));
+        /* direction au hasard, retirée tant que le point d'arrivée (vitesse / frottement de pickup.c) n'est pas du sol libre */
+        float vx = 0.0f, vy = 0.0f;
+        for (int tries = 0; tries < 12; tries++) {
+            float a = SDL_randf() * 2.0f * SDL_PI_F, sp = tuning.box_spill_speed * (0.6f + 0.4f * SDL_randf());
+            float tx = cosf(a) * sp, ty = sinf(a) * sp * 0.7f;
+            SDL_FRect land = { b->x + tx / tuning.box_spill_friction - 8.0f, b->y + 4.0f + ty / tuning.box_spill_friction - 8.0f, 16.0f, 16.0f };
+            if (!room_blocks_walk(&g->room, &land)) { vx = tx; vy = ty; break; }
+        }
+        pickup_spill(&g->pickups, type, b->x, b->y + 4.0f, vx, vy, tuning.box_spill_delay + 0.05f * (float)i);
+    }
+}
+
+/* Boîtes touchées : la grise s'ouvre, la dorée avec une clef de fa ; l'objet d'une boîte ouverte se prend. */
+static void resolve_boxes(Game *g)
+{
+    if (g->box_cooldown > 0.0f) return;
+    FloorRoom *fr = &g->floor.rooms[g->room.index];
+    for (int i = 0; i < fr->box_count; i++) {
+        MusicBox *b = &fr->boxes[i];
+        SDL_FRect r = box_rect(b);
+        if (!overlaps(&r, &g->player.box)) { b->touched = false; continue; }
+        if (b->open) {
+            /* l'objet se prend en revenant sur la boîte, pas dans l'élan qui l'a ouverte */
+            if (b->item >= 0 && !b->touched) {
+                take_item(g, (ItemId)b->item);
+                b->item = -1;
+            }
+            b->touched = true;
+            continue;
+        }
+        b->touched = true;
+        if (b->golden) {
+            if (g->player.stats.keys[KEY_FA] <= 0) continue;
+            g->player.stats.keys[KEY_FA]--;
+            audio_play(SOUND_UNLOCK, 1.0f);
+        }
+        open_box(g, b);
+    }
+}
+
+/* Portes fermées à clef : les toucher avec la bonne clef les ouvre pour de bon. */
+static void resolve_locked_doors(Game *g)
+{
+    FloorRoom *fr = &g->floor.rooms[g->room.index];
+    for (int i = 0; i < g->room.door_count; i++) {
+        const RoomDoor *d = &g->room.doors[i];
+        if (!d->locked) continue;
+        SDL_FRect reach = { d->opening.x - 6.0f, d->opening.y - 6.0f, d->opening.w + 12.0f, d->opening.h + 12.0f };
+        if (!overlaps(&reach, &g->player.box) || g->player.stats.keys[d->lock_key] <= 0) continue;
+        g->player.stats.keys[d->lock_key]--;
+        FloorRoom *locked = fr->locked ? fr : &g->floor.rooms[d->target];
+        locked->locked = false;
+        room_refresh_locks(&g->room, &g->floor);
+        audio_play(SOUND_UNLOCK, 1.0f);
+        return;
+    }
 }
 
 void game_give_next_item(Game *g)
@@ -636,21 +868,36 @@ void game_give_next_item(Game *g)
     }
 }
 
-/* Salle vidée : prix au centre, et la trappe si c'était le boss. */
+/* Salle vidée (GDD §22) : les obstacles qu'on casse en tirant se cassent tout seuls, toujours une
+ * récompense au centre, et la trappe si c'était le boss. */
 static void room_cleared(Game *g)
 {
     FloorRoom *fr = &g->floor.rooms[g->room.index];
+    RoomLayout *L = layout_of(g);
+    for (int i = 0; i < L->obstacle_count; i++) {
+        Obstacle *o = &L->obstacles[i];
+        if (o->alive && (o->type == OBST_INKWELL || o->type == OBST_CANDLE)) break_obstacle(g, o);
+    }
+    float x, y;
+    room_middle(&g->room, &x, &y);
     if (fr->kind == ROOM_BOSS) {
         room_open_trapdoor(&g->room);
         room_place_offers(&g->room, true);
         free_player_from_props(g);
         g->trapdoor_armed = false;
         g->socle_armed = false;
+        x -= 170.0f;   /* à côté de la trappe et des lutrins */
+        y += 20.0f;
     }
-    if (SDL_randf() < tuning.reward_chance) {
-        float x, y;
-        room_middle(&g->room, &x, &y);
-        pickup_spawn(&g->pickups, SDL_rand(2) == 0 ? PICKUP_BOMB : PICKUP_COIN, x, y);
+    RewardKind k = (RewardKind)weighted_pick(tuning.reward_weight, REWARD_COUNT);
+    switch (k) {
+    case REWARD_COIN:     pickup_spawn(&g->pickups, PICKUP_COIN, x, y); break;
+    case REWARD_BOMB:     pickup_spawn(&g->pickups, PICKUP_BOMB, x, y); break;
+    case REWARD_KEY_SOL:  pickup_spawn(&g->pickups, PICKUP_KEY_SOL, x, y); break;
+    case REWARD_KEY_FA:   pickup_spawn(&g->pickups, PICKUP_KEY_FA, x, y); break;
+    case REWARD_KEY_UT:   pickup_spawn(&g->pickups, PICKUP_KEY_UT, x, y); break;
+    case REWARD_BOX_GRAY: add_box(g, x, y, false); break;
+    default:              add_box(g, x, y, true); break;
     }
 }
 
@@ -682,6 +929,7 @@ void game_step(Game *g, const Input *in, float dt)
     g->time += dt;
     if (g->shake_timer > 0.0f) g->shake_timer -= dt;
     if (g->cry_cooldown > 0.0f) g->cry_cooldown -= dt;
+    if (g->box_cooldown > 0.0f) g->box_cooldown -= dt;
 
     /* Pendant le glissement entre deux salles, le jeu est en pause. */
     if (g->transition.active) {
@@ -730,7 +978,7 @@ void game_step(Game *g, const Input *in, float dt)
         Pickup *pk = &g->pickups.items[i];
         if (pickup_reached(pk, px, py)) {
             collect(g, pk->type);
-            audio_play(pk->type == PICKUP_BOMB ? SOUND_PICKUP_BOMB : SOUND_PICKUP_COIN, 1.0f);
+            audio_play(pk->type == PICKUP_BOMB ? SOUND_PICKUP_BOMB : pk->type == PICKUP_COIN ? SOUND_PICKUP_COIN : SOUND_KEY, 1.0f);
             pk->active = false;
         }
     }
@@ -766,6 +1014,8 @@ void game_step(Game *g, const Input *in, float dt)
         resolve_shots_vs_obstacles(g);
     }
     resolve_offers(g);
+    resolve_boxes(g);
+    resolve_locked_doors(g);
 
     if (g->player.stats.hp <= 0) {
         g->deaths++;
@@ -806,13 +1056,13 @@ void game_step(Game *g, const Input *in, float dt)
 }
 
 /* Ce qui est trié par profondeur : on dessine d'abord ce dont le pied est le plus haut. */
-typedef enum DrawKind { DRAW_PLAYER, DRAW_ENEMY, DRAW_LUTRIN, DRAW_BOMB, DRAW_PICKUP, DRAW_OBSTACLE } DrawKind;
+typedef enum DrawKind { DRAW_PLAYER, DRAW_ENEMY, DRAW_LUTRIN, DRAW_BOMB, DRAW_PICKUP, DRAW_OBSTACLE, DRAW_BOX } DrawKind;
 typedef struct DrawItem {
     float    y;
     DrawKind kind;
     int      index;
 } DrawItem;
-#define MAX_DRAW_ITEMS (1 + MAX_ENEMIES + ROOM_MAX_PROPS + MAX_BOMBS + MAX_PICKUPS + MAX_OBSTACLES)
+#define MAX_DRAW_ITEMS (1 + MAX_ENEMIES + ROOM_MAX_PROPS + MAX_BOMBS + MAX_PICKUPS + MAX_OBSTACLES + ROOM_MAX_BOXES)
 
 static void push_item(DrawItem *items, int *n, float y, DrawKind kind, int index)
 {
@@ -824,6 +1074,26 @@ static void push_item(DrawItem *items, int *n, float y, DrawKind kind, int index
     items[k] = (DrawItem){ y, kind, index };
 }
 
+/* Soin du magasin : un petit soufflet de crescendo rouge, comme la barre de vie. */
+static void render_heal_icon(SDL_Renderer *r, float cx, float cy)
+{
+    SDL_FColor red = { 0.80f, 0.20f, 0.17f, 1.0f }, light = { 0.93f, 0.89f, 0.80f, 1.0f };
+    SDL_Vertex v[6] = {
+        { { cx - 16.0f, cy }, light, { 0, 0 } }, { { cx + 16.0f, cy - 11.0f }, light, { 0, 0 } }, { { cx + 16.0f, cy + 11.0f }, light, { 0, 0 } },
+        { { cx - 12.0f, cy }, red, { 0, 0 } },   { { cx + 13.0f, cy - 8.0f }, red, { 0, 0 } },    { { cx + 13.0f, cy + 8.0f }, red, { 0, 0 } },
+    };
+    SDL_RenderGeometry(r, NULL, v, 6, NULL, 0);
+}
+
+/* Prix d'une chose du magasin : la couronne et le nombre de royalties, sous le lutrin. */
+static void render_price(SDL_Renderer *r, float cx, float y, bool affordable)
+{
+    SDL_Color c = affordable ? (SDL_Color){ 60, 40, 30, 255 } : (SDL_Color){ 150, 40, 34, 255 };
+    float w = 14.0f + 2.0f * 4.0f * 2.0f;
+    draw_crown(r, cx - w * 0.5f + 5.0f, y + 5.0f, 0.9f);
+    draw_number(r, cx - w * 0.5f + 14.0f, y, tuning.shop_price, 2, 2.0f, c);
+}
+
 static void render_prop(const Game *g, SDL_Renderer *r, int i, Camera cam)
 {
     room_render_prop(&g->room, i, r, cam);
@@ -831,11 +1101,28 @@ static void render_prop(const Game *g, SDL_Renderer *r, int i, Camera cam)
     const SDL_FRect *p = &g->room.props[i];
     float bob = sinf(g->time * 3.0f + (float)i) * 3.0f;
     float x = p->x + p->w * 0.5f - cam.x;
+    bool shop = fr->kind == ROOM_SHOP, rich = g->player.stats.coins >= tuning.shop_price;
     if (g->room.prop_kind[i] == PROP_WEAPON) {
         if (fr->weapon_offer >= 0) weapon_render_icon((WeaponId)fr->weapon_offer, r, x, p->y + p->h - 62.0f + bob - cam.y, 1.0f);
+    } else if (g->room.prop_kind[i] == PROP_HEAL) {
+        if (!fr->heal_sold) {
+            render_heal_icon(r, x, p->y + p->h - 90.0f + bob - cam.y);
+            render_price(r, x, p->y + p->h + 10.0f - cam.y, rich);
+        }
     } else if (i < TREASURE_OFFERS && fr->offers[i] >= 0) {
         item_render((ItemId)fr->offers[i], r, x, p->y + p->h - 98.0f + bob - cam.y);
+        if (shop) render_price(r, x, p->y + p->h + 10.0f - cam.y, rich);
     }
+}
+
+/* Boîte à musique, et l'objet qui flotte au-dessus d'une boîte dorée ouverte. */
+static void render_box(const Game *g, const MusicBox *b, SDL_Renderer *r, Camera cam)
+{
+    float x = b->x - cam.x, y = b->y - cam.y;
+    draw_ellipse(r, x + 1.0f, y, 21.0f, 5.0f, (SDL_Color){ 60, 40, 30, 110 });
+    SpriteId id = b->golden ? (b->open ? SPR_BOX_GOLD_OPEN : SPR_BOX_GOLD) : (b->open ? SPR_BOX_GRAY_OPEN : SPR_BOX_GRAY);
+    sprite_draw(r, id, SDL_floorf(x - 24.0f), SDL_floorf(y - 44.0f), false, false);
+    if (b->open && b->item >= 0) item_render((ItemId)b->item, r, x, y - 62.0f + sinf(g->time * 3.0f) * 3.0f);
 }
 
 /* La salle courante et ses occupants, vus par la caméra `cam`. */
@@ -875,6 +1162,8 @@ static void render_room_contents(const Game *g, SDL_Renderer *r, float alpha, Ca
         const Obstacle *o = &L->obstacles[i];
         if (o->alive && !obstacle_flat(o->type)) push_item(items, &n, obstacle_feet_y(L, o), DRAW_OBSTACLE, i);
     }
+    const FloorRoom *fr = &g->floor.rooms[g->room.index];
+    for (int i = 0; i < fr->box_count; i++) push_item(items, &n, fr->boxes[i].y, DRAW_BOX, i);
     for (int k = 0; k < n; k++) {
         int i = items[k].index;
         switch (items[k].kind) {
@@ -884,6 +1173,7 @@ static void render_room_contents(const Game *g, SDL_Renderer *r, float alpha, Ca
         case DRAW_BOMB:   bomb_render(&g->bombs.items[i], r, cam); break;
         case DRAW_PICKUP: pickup_render(&g->pickups.items[i], r, alpha, cam); break;
         case DRAW_OBSTACLE: obstacle_render(L, &L->obstacles[i], r, cam, g->time); break;
+        case DRAW_BOX:      render_box(g, &fr->boxes[i], r, cam); break;
         }
     }
 

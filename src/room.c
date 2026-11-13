@@ -123,9 +123,13 @@ void room_build(Room *room, const Floor *floor, int index)
             build_side(room, room->cells[i], (Dir)s, door);
         }
     }
+    room_refresh_locks(room, floor);
 
     if (fr->kind == ROOM_TREASURE) {
         room_place_offers(room, false);
+    }
+    if (fr->kind == ROOM_SHOP) {
+        room_place_shop(room);
     }
     /* Salle du boss déjà vaincu : la trappe et les récompenses sont toujours là. */
     if (fr->kind == ROOM_BOSS && fr->cleared) {
@@ -150,6 +154,31 @@ void room_place_offers(Room *room, bool boss)
     }
     room->prop_kind[room->prop_count] = PROP_WEAPON;
     room->props[room->prop_count++] = (SDL_FRect){ mx - CHEST_W * 0.5f, chest_y - CHEST_H * 0.5f, CHEST_W, CHEST_H };
+}
+
+void room_refresh_locks(Room *room, const Floor *floor)
+{
+    /* Portes fermées à clef : celles d'une salle fermée, et celles qui y mènent. */
+    const FloorRoom *fr = &floor->rooms[room->index];
+    for (int i = 0; i < room->door_count; i++) {
+        RoomDoor *d = &room->doors[i];
+        const FloorRoom *other = (d->target >= 0 && d->target < floor->room_count) ? &floor->rooms[d->target] : NULL;
+        d->locked = fr->locked || (other && other->locked);
+        d->lock_key = fr->locked ? fr->lock_key : (other ? other->lock_key : 0);
+    }
+}
+
+void room_place_shop(Room *room)
+{
+    float mx, my;
+    room_middle(room, &mx, &my);
+    room->prop_count = 0;
+    const int n = TREASURE_OFFERS + 1;
+    for (int i = 0; i < n; i++) {
+        float x = mx + ((float)i - (float)(n - 1) * 0.5f) * (LUTRIN_GAP * 0.8f);
+        room->prop_kind[room->prop_count] = i < TREASURE_OFFERS ? PROP_LUTRIN : PROP_HEAL;
+        room->props[room->prop_count++] = (SDL_FRect){ x - LUTRIN_W * 0.5f, my - 40.0f - LUTRIN_H * 0.5f, LUTRIN_W, LUTRIN_H };
+    }
 }
 
 void room_middle(const Room *room, float *x, float *y)
@@ -236,10 +265,8 @@ bool room_overlaps_solid(const Room *room, const SDL_FRect *r, bool props)
         if (overlaps(r, &room->props[i])) return true;
     }
     if (props && overlaps_obstacle(room, r, false)) return true;
-    if (!room->doors_open) {
-        for (int i = 0; i < room->door_count; i++) {
-            if (overlaps(r, &room->doors[i].opening)) return true;
-        }
+    for (int i = 0; i < room->door_count; i++) {
+        if (room_door_closed(room, i) && overlaps(r, &room->doors[i].opening)) return true;
     }
     return false;
 }
@@ -282,10 +309,8 @@ static int collide_axis(const Room *room, SDL_FRect *box, float dx, float dy)
             }
         }
     }
-    if (!room->doors_open) {
-        for (int i = 0; i < room->door_count; i++) {
-            blocked |= push_out(box, &room->doors[i].opening, dx, dy);
-        }
+    for (int i = 0; i < room->door_count; i++) {
+        if (room_door_closed(room, i)) blocked |= push_out(box, &room->doors[i].opening, dx, dy);
     }
     return blocked;
 }
@@ -298,6 +323,11 @@ int room_move_box(const Room *room, SDL_FRect *box, float dx, float dy)
     box->y += dy;
     if (dy != 0.0f) blocked |= collide_axis(room, box, 0.0f, dy);
     return blocked;
+}
+
+bool room_door_closed(const Room *room, int i)
+{
+    return !room->doors_open || room->doors[i].locked;
 }
 
 void room_set_doors_open(Room *room, bool open, SDL_FRect *keep_out)
@@ -321,7 +351,7 @@ const RoomDoor *room_door_at(const Room *room, float x, float y)
 {
     SDL_FPoint p = { x, y };
     for (int i = 0; i < room->door_count; i++) {
-        if (SDL_PointInRectFloat(&p, &room->doors[i].trigger)) return &room->doors[i];
+        if (!room_door_closed(room, i) && SDL_PointInRectFloat(&p, &room->doors[i].trigger)) return &room->doors[i];
     }
     return NULL;
 }

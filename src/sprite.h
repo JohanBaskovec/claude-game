@@ -38,6 +38,10 @@ typedef enum SpriteId {
     /* Obstacles de la phase 12 : planche PNG seulement. */
     SPR_BOOKS_0, SPR_BOOKS_1, SPR_INKWELL, SPR_CANDLE_0, SPR_CANDLE_1,
     SPR_NEEDLES_IN, SPR_NEEDLES_TIPS, SPR_NEEDLES_OUT,
+    /* Clefs et boîtes à musique de la phase 13 : planche PNG seulement. Clefs dans l'ordre KeyKind. */
+    SPR_KEY_SOL, SPR_KEY_FA, SPR_KEY_UT,
+    SPR_BOX_GRAY, SPR_BOX_GRAY_OPEN, SPR_BOX_GOLD, SPR_BOX_GOLD_OPEN,
+    SPR_KEY_SOL_SMALL, SPR_KEY_FA_SMALL, SPR_KEY_UT_SMALL,   /* pour le HUD */
     SPR_COUNT
 } SpriteId;
 

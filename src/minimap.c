@@ -1,4 +1,5 @@
 #include "minimap.h"
+#include "draw.h"
 #include "config.h"
 
 /* Une cellule de 19x9 px garde à peu près le rapport 768x360 du sol,
@@ -81,6 +82,11 @@ void minimap_render(const Floor *floor, int current, SDL_Renderer *r, bool revea
             float tx = MM_X + room->cell_x[0] * MM_CELL_W + MM_CELL_W * 0.5f - 2.0f;
             float ty = MM_Y + room->cell_y[0] * MM_CELL_H + MM_CELL_H * 0.5f - 2.0f;
             fill(r, tx, ty, 5.0f, 4.0f, 236, 190, 52, 255);
+        } else if (room->kind == ROOM_SHOP) {
+            /* Marque du magasin : une petite couronne (les royalties). */
+            float sx = MM_X + room->cell_x[0] * MM_CELL_W + MM_CELL_W * 0.5f;
+            float sy = MM_Y + room->cell_y[0] * MM_CELL_H + MM_CELL_H * 0.5f;
+            draw_crown(r, sx, sy, 0.45f);
         }
     }
 

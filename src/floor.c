@@ -179,7 +179,7 @@ static int pick_enemy(Uint64 *rng)
 static bool attempt(Floor *f, Uint64 *rng)
 {
     clear(f);
-    f->boss = f->treasure = -1;
+    f->boss = f->treasure = f->shop = -1;
     int target = tuning.floor_min_rooms + SDL_rand_r(rng, tuning.floor_max_rooms - tuning.floor_min_rooms + 1);
 
     f->start = try_place(f, SHAPE_1x1, FLOOR_START_X, FLOOR_START_Y, -1);
@@ -231,8 +231,12 @@ static bool attempt(Floor *f, Uint64 *rng)
         if (r == f->start || r == f->boss || f->rooms[r].cell_count != 1) continue;
         if (distinct_neighbours(&f->rooms[r]) == 1) candidates[nc++] = r;
     }
-    if (nc == 0) return false;
-    f->treasure = candidates[SDL_rand_r(rng, nc)];
+    if (nc < 2) return false;
+    int pick = SDL_rand_r(rng, nc);
+    f->treasure = candidates[pick];
+    /* Magasin : encore un autre cul-de-sac d'une cellule, fermé par une clef de sol (GDD §22). */
+    candidates[pick] = candidates[--nc];
+    f->shop = candidates[SDL_rand_r(rng, nc)];
 
     for (int r = 0; r < f->room_count; r++) {
         FloorRoom *room = &f->rooms[r];
@@ -246,6 +250,10 @@ static bool attempt(Floor *f, Uint64 *rng)
             }
         } else if (r == f->treasure) {
             room->kind = ROOM_TREASURE;
+        } else if (r == f->shop) {
+            room->kind = ROOM_SHOP;
+            room->locked = true;
+            room->lock_key = KEY_SOL;
         } else {
             int n = SDL_rand_r(rng, tuning.room_max_babies + 1)
                   + tuning.room_babies_per_extra_cell * (room->cell_count - 1);

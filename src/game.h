@@ -52,6 +52,8 @@ typedef struct Game {
     float          shake_timer;           /* tremblement de l'écran, s */
     float          time;                  /* s de jeu, pour les animations */
     float          cry_cooldown;          /* s avant qu'un bébé puisse de nouveau pleurer (tuning.baby_cry_gap) */
+    float          box_cooldown;          /* s avant qu'une boîte qui vient d'apparaître puisse s'ouvrir */
+    char           heal_text[32];         /* texte du bandeau du soin acheté */
 
     /* Affichage de la mini-carte, réglé par la fenêtre (souris, menu de debug). */
     bool           reveal_map; /* toute la carte visible et téléportation partout (debug) */
@@ -83,6 +85,8 @@ void game_spawn_enemy(Game *g, EnemyType type);
 /* Debug : donne le prochain objet passif pas encore pris. */
 void game_give_next_item(Game *g);
 void game_kill_enemies(Game *g);
+/* Debug : une boîte à musique (grise ou dorée au hasard) près du joueur. */
+void game_spawn_box(Game *g);
 
 /* Caméra de la salle courante (alpha : interpolation du rendu). */
 Camera game_camera(const Game *g, float alpha);

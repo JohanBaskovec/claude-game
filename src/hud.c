@@ -1,4 +1,5 @@
 #include "hud.h"
+#include "sprite.h"
 #include "config.h"
 #include "draw.h"
 #include "weapon.h"
@@ -105,6 +106,12 @@ void hud_render(const Hud *hud, SDL_Renderer *r, const PlayerStats *stats)
     draw_number(r, COUNT_X + 14.0f, COUNT_Y - 5.0f, stats->coins, 2, 2.0f, text);
     draw_metronome(r, COUNT_X, COUNT_Y + COUNT_STEP, 1.0f, 0.35f);
     draw_number(r, COUNT_X + 14.0f, COUNT_Y + COUNT_STEP - 5.0f, stats->bombs, 2, 2.0f, text);
+    /* Clefs de sol, de fa, d'ut (GDD §22). */
+    for (int k = 0; k < KEY_COUNT; k++) {
+        float y = COUNT_Y + COUNT_STEP * (float)(2 + k);
+        sprite_draw(r, (SpriteId)(SPR_KEY_SOL_SMALL + k), COUNT_X - 26.0f, y - 24.0f, false, false);
+        draw_number(r, COUNT_X + 14.0f, y - 5.0f, stats->keys[k], 2, 2.0f, text);
+    }
 
     /* Arme tenue, dans un cadre à côté des compteurs. */
     draw_rect(r, 86, 64, 40, 40, (SDL_Color){ 236, 226, 204, 255 });

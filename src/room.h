@@ -32,6 +32,7 @@
 typedef enum PropKind {
     PROP_LUTRIN,   /* porte un objet passif (offers[i]) */
     PROP_WEAPON,   /* socle d'arme (weapon_offer) */
+    PROP_HEAL,     /* magasin : le soin (GDD §22) */
 } PropKind;
 
 typedef struct RoomDoor {
@@ -41,6 +42,8 @@ typedef struct RoomDoor {
     SDL_FRect opening;         /* trou dans le mur ; bloqué quand la porte est fermée */
     SDL_FRect trigger;         /* le centre du joueur ici = on passe la porte */
     float     entry_x, entry_y;/* centre du joueur quand il arrive par cette porte */
+    bool      locked;          /* fermée à clef (salle d'un côté ou de l'autre fermée, GDD §22) */
+    int       lock_key;        /* KeyKind qui l'ouvre */
 } RoomDoor;
 
 typedef struct Room {
@@ -65,6 +68,9 @@ typedef struct Room {
 #define NAV_FAR 0xFFFF
 
 void room_build(Room *room, const Floor *floor, int index);
+
+/* Recalcule les portes fermées à clef d'après le plan (après avoir ouvert une serrure). */
+void room_refresh_locks(Room *room, const Floor *floor);
 
 /* Vrai si le rectangle chevauche un mur, un meuble ou une porte fermée. */
 bool room_overlaps_wall(const Room *room, const SDL_FRect *r);
@@ -98,10 +104,13 @@ void room_steer(const Room *room, float x, float y, float tx, float ty, float *s
 #define ROOM_BLOCKED_Y 2
 int room_move_box(const Room *room, SDL_FRect *box, float dx, float dy);
 
+/* Vrai si la porte bloque le passage : portes fermées (combat) ou fermée à clef. */
+bool room_door_closed(const Room *room, int i);
+
 /* Ouvre ou ferme les portes. En fermant, repousse `keep_out` (le joueur) hors des portes. */
 void room_set_doors_open(Room *room, bool open, SDL_FRect *keep_out);
 
-/* Porte franchie si le point (centre du joueur) est dans sa zone de passage, sinon NULL. */
+/* Porte franchie si le point (centre du joueur) est dans sa zone de passage (et qu'elle est ouverte), sinon NULL. */
 const RoomDoor *room_door_at(const Room *room, float x, float y);
 
 /* Porte de cette salle sur le côté `side` de la cellule (cx, cy), sinon NULL. */
@@ -124,6 +133,9 @@ void room_open_trapdoor(Room *room);
 
 /* Pose les 3 lutrins et le socle d'arme (salle du trésor, ou salle du boss vaincu). */
 void room_place_offers(Room *room, bool boss);
+
+/* Magasin : 3 lutrins d'objets et celui du soin, en ligne. */
+void room_place_shop(Room *room);
 
 /* Caméra qui suit le point (x, y), bornée aux murs de la salle. */
 Camera room_camera(const Room *room, float x, float y);

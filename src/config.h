@@ -50,8 +50,27 @@ typedef enum Sound {
     SOUND_DIG,           /* le ver creuse avant de sortir */
     SOUND_BABY_CRY,      /* un bébé pleure : « ouiiinnn » */
     SOUND_BABY_SOB,      /* ... ou sanglote : « oua... ouaaaah » */
+    SOUND_BOX_GRAY,      /* boîte à musique grise ouverte : début d'Ut queant laxis */
+    SOUND_BOX_GOLD,      /* boîte dorée : ut ré mi fa sol la */
+    SOUND_KEY,           /* clef ramassée */
+    SOUND_UNLOCK,        /* serrure ouverte (porte ou boîte dorée) */
     SOUND_COUNT
 } Sound;
+
+/* Clefs (GDD §22). */
+typedef enum KeyKind { KEY_SOL, KEY_FA, KEY_UT, KEY_COUNT } KeyKind;
+
+/* Récompense de fin de salle (GDD §22). */
+typedef enum RewardKind {
+    REWARD_COIN,
+    REWARD_BOMB,
+    REWARD_KEY_SOL,
+    REWARD_KEY_FA,
+    REWARD_KEY_UT,
+    REWARD_BOX_GRAY,
+    REWARD_BOX_GOLD,
+    REWARD_COUNT
+} RewardKind;
 
 /* Armes (GDD §4 et §14). */
 typedef enum WeaponId {
@@ -148,8 +167,8 @@ typedef struct Tuning {
     int   spawn_weight[ENEMY_TYPE_COUNT]; /* chances relatives de chaque ennemi dans une salle normale */
     float room_transition_time;       /* glissement d'une salle à l'autre, s */
 
-    /* Prix de fin de salle (GDD §13) */
-    float reward_chance;              /* probabilité d'un prix quand on vide une salle */
+    /* Prix de fin de salle (GDD §13 et §22) : toujours une récompense */
+    int   reward_weight[REWARD_COUNT];/* chances relatives de chaque récompense */
     float pickup_magnet_delay;        /* temps avant que le prix soit aspiré, s */
     float pickup_magnet_accel;        /* accélération vers le joueur, px/s² */
     float pickup_magnet_max_speed;    /* px/s */
@@ -282,6 +301,17 @@ typedef struct Tuning {
     float chant_volume;               /* chant d'Amadeus (tirs), 0..1 */
     float sfx_volume;                 /* tous les bruitages, 0..1 */
     float sound_gain[SOUND_COUNT];    /* volume de chaque bruitage, 0..1 (peut dépasser 1) */
+
+    /* Magasin et boîtes à musique (GDD §22) */
+    int   shop_price;                 /* prix de chaque chose au magasin, royalties */
+    int   shop_heal;                  /* PV rendus par le soin du magasin */
+    int   box_gray_min, box_gray_max; /* choses dans une boîte grise */
+    int   box_gold_min, box_gold_max; /* ... dans une boîte dorée */
+    float box_gold_item_chance;       /* une boîte dorée contient un objet à la place */
+    int   box_content_weight[3];      /* royalties, métronome, clef (sol, fa ou ut au hasard) */
+    float box_spill_speed;            /* vitesse des choses qui se répandent, px/s */
+    float box_spill_friction;         /* freinage des choses répandues, 1/s : elles s'arrêtent à vitesse / freinage */
+    float box_spill_delay;            /* temps avant qu'elles soient aspirées, s */
     float splat_boss_pitch;           /* mort du boss : même son, plus grave et plus long */
     /* Salles : trous et obstacles (GDD §21) */
     int   layout_features_min;        /* éléments (trous, groupes d'obstacles) par cellule */

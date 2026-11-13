@@ -3,6 +3,7 @@
 
 #include <SDL3/SDL.h>
 
+#include "config.h"
 #include "input.h"
 #include "room.h"
 
@@ -17,6 +18,7 @@ typedef struct PlayerStats {
     float shot_range;   /* portée des tirs, px */
     int   bombs;        /* métronomes */
     int   coins;        /* royalties */
+    int   keys[KEY_COUNT]; /* clefs de sol, de fa, d'ut */
     int   weapon;       /* arme tenue (WeaponId) */
 } PlayerStats;
 

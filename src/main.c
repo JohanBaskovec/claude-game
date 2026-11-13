@@ -197,6 +197,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
     case DEBUG_ACTION_NEW_FLOOR:     game_next_floor(&app->game, random_seed()); break;
     case DEBUG_ACTION_KILL_ENEMIES:  game_kill_enemies(&app->game); break;
     case DEBUG_ACTION_GIVE_ITEM:     game_give_next_item(&app->game); break;
+    case DEBUG_ACTION_SPAWN_BOX:     game_spawn_box(&app->game); break;
     default: break;
     }
     return SDL_APP_CONTINUE;

@@ -3,7 +3,7 @@
 > Document de travail destiné à Claude Code. Il décrit l'univers et les choix de design.
 > **Statut : en cours de conception.** Les sections marquées ✅ sont décidées, 💡 sont des idées à valider, ❓ sont des questions ouvertes.
 > **Source de vérité du design : ce fichier, dans le dépôt** (`docs/concept/GDD.md`). La conception se fait désormais uniquement avec Claude Code, qui le met à jour au fil des décisions prises avec Johan.
-> **Phase en cours : Phase 12 (section 21).** Les Phases 1 à 11 (sections 10 à 20) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
+> **Phase en cours : Phase 13 (section 22).** Les Phases 1 à 12 (sections 10 à 21) sont terminées. Le reste sert de contexte, ne rien coder au-delà sans demande explicite.
 
 ---
 
@@ -140,7 +140,7 @@ Concept visuel ✅ (planche de Johan, `assets/sprites/baby/baby.png`, cases de 2
 | Cœurs (vie) | **Barre de vie** | ✅ | On commence à **10**, maximum **100** (provisoire). **Nom à trouver** : il doit convenir à tous les instruments (voix, vents, cordes, percussions), donc pas « souffle ». Pistes : *Résonance*, *Sustain* (utilisé tel quel en FR et EN par les musiciens). Idée visuelle : la barre a la forme d'un **soufflet de crescendo** (<). |
 | Salle du Diable | **Tartini** | 💡 | Il prétendait que le Diable lui avait joué la *Sonate du trille du Diable* en rêve. |
 | Salle de l'Ange | **Hildegard von Bingen** | 💡 | Nonne visionnaire du XIIe siècle. |
-| Boutique | **Luthier** | 💡 | |
+| Boutique | **Luthier** | ✅ | Le magasin (phase 13). |
 
 ## 6. Objets inspirés d'anecdotes réelles 💡
 
@@ -770,7 +770,7 @@ Les autres sons (dégâts, morts, métronome, ennemis, interface), les sons des 
 ### Hors périmètre (ne pas faire)
 Les autres sons (dégâts reçus, mort d'Amadeus, atterrissage du boss, briques, encre qui tombe au sol, ver qui replonge, portes, objets, interface), les sons des instruments, la musique, le réglage du volume dans un menu.
 
-## 21. PHASE 12 — Parchemin, murs peints, trous et obstacles
+## 21. PHASE 12 — Parchemin, murs peints, trous et obstacles ✅ (terminée)
 
 **But** : changer l'aspect du premier étage (§9 « Sol en parchemin ») et rendre les salles plus vivantes (§9 « Rendre les salles plus vivantes »).
 
@@ -788,7 +788,7 @@ Les autres sons (dégâts reçus, mort d'Amadeus, atterrissage du boss, briques,
 - Les ennemis contournent les obstacles et les trous : ils suivent le chemin le plus court vers le joueur quand la ligne droite est bouchée.
 
 ### Trous ✅
-- Trou déchiré (bord fibreux, ombre, noir dedans), **brûlure** (bord noirci), **trou recousu** (fente traversée de points de couture : on peut marcher dessus).
+- Trou déchiré (bord fibreux, ombre, noir dedans), **brûlure** (bord noirci), **trou recousu** (on peut marcher dessus ; depuis la phase 13, on ne voit plus le trou, seulement la couture).
 - On ne marche pas sur un trou ; les notes et les tirs ennemis passent au-dessus.
 - Le texte du sol contourne les trous.
 - **Ver de livre** : il perce **toujours** un trou rond en sortant, **sans limite** : le laisser vivre troue la salle, il faut l'éliminer vite. Il choisit donc sa sortie sur la case la plus proche d'Amadeus où un trou **ne bouche aucun chemin** (même règle d'accès, en comptant aussi les trous que vont percer les autres vers déjà annoncés). Pas deux vers sur la même case. S'il ne reste aucune case possible, il ressort par un trou de ver déjà percé. Ceux qui se tenaient sur la case sont poussés au bord. Ces trous restent quand on revient.
@@ -811,3 +811,51 @@ Les autres sons (dégâts reçus, mort d'Amadeus, atterrissage du boss, briques,
 
 ### Hors périmètre (ne pas faire)
 Plans de salles faits à la main, salles secrètes, sons des obstacles, autres époques.
+
+---
+
+## 22. PHASE 13 — Clefs, magasin, boîtes à musique
+
+**But** : donner un usage aux royalties et des choses à ramasser : clefs, magasin (le **Luthier**), boîtes à musique, et une récompense à chaque salle vidée.
+
+### Trou recousu ✅
+- Quand on recoud un trou, **on ne voit plus le trou** : seulement une **couture** à l'endroit où il était (la fente refermée, les points de fil en travers, les trous de l'aiguille). Le texte de la page passe par-dessus.
+
+### Salle vidée ✅
+- **Toujours une récompense** quand on vide une salle (avant : 70 %). Tirage provisoire : royalties 30, métronome 22, clef de sol 10, clef de fa 8, clef d'ut 8, boîte à musique grise 15, boîte dorée 7.
+- Une salle normale sans ennemis donne aussi sa récompense à la première entrée.
+- Tous les obstacles qu'on peut casser en tirant (encriers, chandelles) **se cassent tout seuls** quand la salle est vidée, avec leurs effets habituels (flaque, royalties de l'encrier, cire de la chandelle).
+
+### Clefs ✅
+- Trois clefs : **clef de sol**, **clef de fa**, **clef d'ut**. Une clef dorée dont l'anneau a la forme de la clef musicale.
+- Comptées dans le HUD sous les royalties et les métronomes. Lignes dans le menu F2.
+- **Clef de sol** : ouvre la porte du magasin. **Clef de fa** : ouvre les boîtes à musique dorées. **Clef d'ut** : ✅ on la ramasse, mais **elle ne sert à rien pour l'instant** (plus tard : salles secrètes, Tartini, Hildegard…).
+- On en trouve en récompense de salle et dans les boîtes à musique.
+
+### Portes à serrure ✅
+- Une porte fermée à clef reste fermée même quand la salle est vidée ; le bois porte le symbole de la clef qu'il faut.
+- On l'ouvre en la touchant avec la bonne clef (une clef utilisée). Ouverte pour de bon.
+- On ne peut pas se téléporter dans une salle fermée à clef.
+
+### Magasin (le Luthier) ✅
+- Un **cul-de-sac 1 × 1** (ni le départ, ni le boss, ni le trésor), dont la porte est **fermée par une clef de sol**. Marque sur la mini-carte (une couronne).
+- Sur des lutrins : **3 objets** (tirés comme ceux du trésor, jamais les mêmes) et **10 PV**. Chacun coûte **10 royalties**, prix affiché sous le lutrin.
+- On achète en touchant le lutrin si on a assez de royalties ; l'objet acheté disparaît, les autres restent. Les 10 PV ne s'achètent pas si la vie est pleine.
+
+### Boîtes à musique (coffres) ✅
+- **Grise** : s'ouvre en la touchant. **Dorée** : il faut une **clef de fa**.
+- En s'ouvrant, elle joue une **courte mélodie** de boîte à musique (lames de métal pincées) : la grise le début d'*Ut queant laxis*, la dorée la gamme *ut ré mi fa sol la* qu'en a tirée Guido d'Arezzo.
+- Son contenu **se répand autour** puis est aspiré comme les prix : royalties, métronomes, clefs. Grise : 2 à 4 choses ; dorée : 3 à 6, et **très rarement** (8 %) un **objet** à la place, posé dans la boîte ouverte : on le prend en **revenant** toucher la boîte (pas dans l'élan qui l'a ouverte, pour qu'on puisse le laisser). Les choses répandues atterrissent sur du sol libre (jamais dans un mur, un trou ou un obstacle).
+- On les trouve en récompense de salle. Une boîte pas encore ouverte (une dorée sans clef) reste là quand on revient.
+- On marche à travers (ce ne sont pas des obstacles).
+- F2 : bouton pour faire apparaître une boîte.
+
+### Téléportation ✅
+- On peut aussi se téléporter dans une salle **pas encore visitée** mais **reliée à une salle visitée** (les salles sombres de la mini-carte). On y entre **comme si on y avait marché par le plus court chemin** : par la porte qui vient de la salle visitée, pas au milieu de la salle. Toujours interdit en combat.
+
+### Sprites et sons provisoires
+- Clefs et boîtes dessinées par Claude (`assets/sprites/pickups/`), à remplacer.
+- Sons synthétisés : mélodies des boîtes, clef ramassée, serrure qui s'ouvre.
+
+### Hors périmètre (ne pas faire)
+Usage de la clef d'ut, vendeur dessiné dans le magasin, autres choses en vente (clefs, métronomes), salles secrètes, Tartini, Hildegard.

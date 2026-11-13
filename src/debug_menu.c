@@ -39,6 +39,9 @@ static const StatRow ROWS[] = {
     { "Portee des tirs",  "px", NULL,      STAT_FLOAT, offsetof(PlayerStats, shot_range), 20.0f, 20.0f, 2000.0f, 0 },
     { "Metronomes",       "", NULL,        STAT_INT,   offsetof(PlayerStats, bombs),      1.0f,  0.0f,  99.0f,   0 },
     { "Royalties",        "", NULL,        STAT_INT,   offsetof(PlayerStats, coins),      1.0f,  0.0f,  99.0f,   0 },
+    { "Clefs de sol",     "", NULL,        STAT_INT,   offsetof(PlayerStats, keys[KEY_SOL]), 1.0f, 0.0f, 99.0f,  0 },
+    { "Clefs de fa",      "", NULL,        STAT_INT,   offsetof(PlayerStats, keys[KEY_FA]),  1.0f, 0.0f, 99.0f,  0 },
+    { "Clefs d'ut",       "", NULL,        STAT_INT,   offsetof(PlayerStats, keys[KEY_UT]),  1.0f, 0.0f, 99.0f,  0 },
     { "Arme",             "", WEAPON_NAMES, STAT_INT,  offsetof(PlayerStats, weapon),     1.0f,  0.0f,  WEAPON_COUNT - 1, 0 },
 };
 #define ROW_COUNT ((int)(sizeof(ROWS) / sizeof(ROWS[0])))
@@ -51,7 +54,8 @@ static const StatRow ROWS[] = {
 #define BTN_ITEM  (ROW_COUNT * 2 + 4)
 #define BTN_ENEMY_PREV (ROW_COUNT * 2 + 5)   /* ligne « Ennemi » : - et + */
 #define BTN_ENEMY_NEXT (ROW_COUNT * 2 + 6)
-#define BTN_COUNT (ROW_COUNT * 2 + 7)
+#define BTN_BOX   (ROW_COUNT * 2 + 7)
+#define BTN_COUNT (ROW_COUNT * 2 + 8)
 
 /* Mise en page, en pixels du jeu. La police de debug fait 8x8 px. */
 #define GLYPH     8.0f
@@ -59,7 +63,7 @@ static const StatRow ROWS[] = {
 #define PANEL_X   (GAME_W - PANEL_W - 8.0f)
 #define PANEL_Y   (minimap_bottom() + 10.0f)   /* sous la mini-carte, qui reste cliquable */
 #define ROWS_Y    (PANEL_Y + 30.0f)
-#define ROW_H     24.0f
+#define ROW_H     20.0f
 #define BTN_W     20.0f
 #define BTN_H     18.0f
 #define MINUS_X   (PANEL_X + 256.0f)
@@ -81,6 +85,7 @@ static const char *BABY_LABEL  = "Ajouter";
 static const char *FLOOR_LABEL = "Etage suivant";
 static const char *KILL_LABEL  = "Tuer les ennemis";
 static const char *ITEM_LABEL  = "Donner un objet";
+static const char *BOX_LABEL   = "Boite a musique";
 
 static SDL_FRect button_rect(int id)
 {
@@ -98,6 +103,9 @@ static SDL_FRect button_rect(int id)
     }
     if (id == BTN_ITEM) {
         return (SDL_FRect){ PANEL_X + 10.0f, ACTION3_Y, RESET_W, BTN_H };
+    }
+    if (id == BTN_BOX) {
+        return (SDL_FRect){ PANEL_X + PANEL_W - 10.0f - BABY_W, ACTION3_Y, BABY_W, BTN_H };
     }
     if (id == BTN_ENEMY_PREV || id == BTN_ENEMY_NEXT) {
         return (SDL_FRect){ id == BTN_ENEMY_PREV ? MINUS_X : PLUS_X, ENEMY_Y - 5.0f, BTN_W, BTN_H };
@@ -177,6 +185,7 @@ static DebugAction press(DebugMenu *m, int id, PlayerStats *st)
     if (id == BTN_FLOOR) return DEBUG_ACTION_NEW_FLOOR;
     if (id == BTN_KILL)  return DEBUG_ACTION_KILL_ENEMIES;
     if (id == BTN_ITEM)  return DEBUG_ACTION_GIVE_ITEM;
+    if (id == BTN_BOX)   return DEBUG_ACTION_SPAWN_BOX;
     const StatRow *row = &ROWS[id / 2];
     float v = get_value(row, st) + ((id % 2 == 0) ? -row->step : row->step);
     v = roundf(v / row->step) * row->step;   /* évite la dérive des flottants */
@@ -323,6 +332,7 @@ void debug_menu_render(const DebugMenu *m, SDL_Renderer *r, const PlayerStats *s
     draw_button(r, m, BTN_FLOOR, FLOOR_LABEL, true);
     draw_button(r, m, BTN_KILL, KILL_LABEL, true);
     draw_button(r, m, BTN_ITEM, ITEM_LABEL, true);
+    draw_button(r, m, BTN_BOX, BOX_LABEL, true);
 
     /* Ennemi que fait apparaître « Ajouter ». */
     draw_text(r, PANEL_X + 10.0f, ENEMY_Y, "Ennemi", 200);

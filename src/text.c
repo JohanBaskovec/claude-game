@@ -39,6 +39,8 @@ static const char *const TEXTS[TXT_COUNT][LANG_COUNT] = {
     [TXT_WEAPON_BELL_DESC]      = { "Rare, mais ça résonne", "Rare, but it resonates" },
     [TXT_WEAPON_ORGAN_NAME]     = { "Orgue", "Organ" },
     [TXT_WEAPON_ORGAN_DESC]     = { "Un accord qui traverse tout... et cloue sur place", "A chord that pierces all... and roots you" },
+    [TXT_SHOP_HEAL_NAME]        = { "Soin", "Healing" },
+    [TXT_SHOP_HEAL_DESC]        = { "+%d PV", "+%d HP" },   /* tuning.shop_heal */
 };
 
 void text_init_from_locale(void)

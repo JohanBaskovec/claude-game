@@ -1,4 +1,5 @@
 #include "decor.h"
+#include "sprite.h"
 #include "font.h"
 
 #include <math.h>
@@ -1115,13 +1116,7 @@ static float hole_sd(const RoomLayout *L, int kind, float x, float y, int solo_x
             } else {
                 bool l = tile_is(L, nx - 1, ny, kind), r = tile_is(L, nx + 1, ny, kind);
                 bool u = tile_is(L, nx, ny - 1, kind), dn = tile_is(L, nx, ny + 1, kind);
-                float ix = 5.0f, iy = 5.0f, rad = 9.0f;
-                if (kind == TILE_SEWN) {
-                    bool vert = u || dn;   /* fente dans le sens des cases voisines */
-                    ix = vert ? 17.0f : 5.0f;
-                    iy = vert ? 4.0f : 14.0f;
-                    rad = 5.0f;
-                }
+                const float ix = 5.0f, iy = 5.0f, rad = 9.0f;
                 d = sd_round_box(x, y, t.x + (l ? -rad - 2.0f : ix), t.y + (u ? -rad - 2.0f : iy),
                                  t.x + t.w - (r ? -rad - 2.0f : ix), t.y + t.h - (dn ? -rad - 2.0f : iy), rad);
             }
@@ -1174,19 +1169,45 @@ static void hole_pixel(const RoomLayout *L, int kind, float x, float y, int solo
     }
 }
 
-/* Trou recousu : points de couture par-dessus la fente. */
-static void stitch_pixel(const RoomLayout *L, float x, float y, Uint8 *o)
+/* Trou recousu (GDD §22) : on ne voit plus le trou, seulement la couture. Une fente refermée un peu
+ * ondulée, le papier légèrement fripé de part et d'autre, des points de fil en biais et les trous de
+ * l'aiguille. La couture suit les cases recousues voisines (horizontale, ou verticale). */
+static void sewn_pixel(const RoomLayout *L, float x, float y, Uint8 *o)
 {
     float ox = (float)L->cx0 * CELL_TILES_X * TILE_W, oy = (float)L->cy0 * CELL_TILES_Y * TILE_H;
     int tx = (int)floorf((x - ox) / TILE_W), ty = (int)floorf((y - oy) / TILE_H);
-    if (!tile_is(L, tx, ty, TILE_SEWN)) return;
-    bool vert = tile_is(L, tx, ty - 1, TILE_SEWN) || tile_is(L, tx, ty + 1, TILE_SEWN);
-    float d = hole_sd(L, TILE_SEWN, x, y, -1, -1);
-    float along = vert ? y : x;
-    float ph = fmodf(along, 8.0f);
-    if (d < 4.5f && ph < 2.0f) {
-        if (d > 3.0f) put_rgba(o, 70, 50, 40, 1.0f);                                   /* trou de l'aiguille */
-        else put_rgba(o, ph < 1.0f ? 230 : 176, ph < 1.0f ? 214 : 156, ph < 1.0f ? 174 : 116, 1.0f);   /* fil */
+    float best = 1e9f, perp = 0.0f, along = 0.0f;
+    for (int ny = ty - 1; ny <= ty + 1; ny++) {
+        for (int nx = tx - 1; nx <= tx + 1; nx++) {
+            if (!tile_is(L, nx, ny, TILE_SEWN)) continue;
+            SDL_FRect t = layout_tile_rect(L, nx, ny);
+            bool vert = tile_is(L, nx, ny - 1, TILE_SEWN) || tile_is(L, nx, ny + 1, TILE_SEWN);
+            float a = vert ? y : x, b = vert ? x : y;   /* le long de la couture, et en travers */
+            float a0 = vert ? t.y : t.x, len = vert ? t.h : t.w, mid = vert ? t.x + t.w * 0.5f : t.y + t.h * 0.5f;
+            bool before = vert ? tile_is(L, nx, ny - 1, TILE_SEWN) : tile_is(L, nx - 1, ny, TILE_SEWN);
+            bool after = vert ? tile_is(L, nx, ny + 1, TILE_SEWN) : tile_is(L, nx + 1, ny, TILE_SEWN);
+            float lo = a0 + (before ? 0.0f : 7.0f), hi = a0 + len - (after ? 0.0f : 7.0f);
+            float pp = b - mid - 1.3f * sinf(a * 0.21f) - 0.8f * sinf(a * 0.53f + 1.0f);
+            float out = a < lo ? lo - a : a > hi ? a - hi : 0.0f;
+            float dist = sqrtf(out * out + pp * pp);
+            if (dist < best) { best = dist; perp = out > 0.0f ? 99.0f : pp; along = a; }
+        }
+    }
+    put_rgba(o, 0, 0, 0, 0.0f);
+    if (best > 8.0f) return;
+    float ap = fabsf(perp);
+    if (ap < 6.0f) {   /* papier fripé : un côté plus clair, l'autre dans l'ombre */
+        float k = 1.0f - ap / 6.0f;
+        if (perp < 0.0f) put_rgba(o, 246, 236, 210, 0.22f * k);
+        else put_rgba(o, 70, 50, 34, 0.18f * k);
+    }
+    if (ap < 0.9f) put_rgba(o, 92, 68, 50, 0.85f);                      /* la fente refermée */
+    float ph = fmodf(along + perp * 0.6f + 700.0f, 7.0f);
+    if (ap < 4.2f && ph < 1.5f) {                                       /* point de fil, en biais */
+        bool lit = ph < 0.75f;
+        put_rgba(o, lit ? 232 : 182, lit ? 214 : 158, lit ? 168 : 112, 1.0f);
+    } else if (ap >= 4.2f && ap < 5.4f && ph < 1.6f) {
+        put_rgba(o, 74, 54, 42, 0.9f);                                  /* trou de l'aiguille */
     }
 }
 
@@ -1218,8 +1239,8 @@ static void build_hole(RoomTex *rt, const Room *room, SDL_Renderer *rend, int ki
                     float x = (float)(cx + px) + 0.5f, y = (float)(cy + py) + 0.5f;
                     put_rgba(o, 0, 0, 0, 0.0f);
                     if (!point_on_floor(room, x, y)) continue;
-                    hole_pixel(L, kind, x, y, solo_x, solo_y, o);
-                    if (kind == TILE_SEWN) stitch_pixel(L, x, y, o);
+                    if (kind == TILE_SEWN) sewn_pixel(L, x, y, o);
+                    else hole_pixel(L, kind, x, y, solo_x, solo_y, o);
                     any |= o[3] != 0;
                 }
             }
@@ -1635,7 +1656,7 @@ void decor_set_floor(const Floor *floor)
         for (int ty = 0; ty < L->h; ty++) {
             for (int tx = 0; tx < L->w; tx++) {
                 int px = L->cx0 * CELL_TILES_X + tx, py = L->cy0 * CELL_TILES_Y + ty;
-                if (tile_is_hole(L->tiles[ty][tx]) && px < PAGE_TX && py < PAGE_TY) page_holes[py][px] = 1;
+                if (tile_is_pit(L->tiles[ty][tx]) && px < PAGE_TX && py < PAGE_TY) page_holes[py][px] = 1;   /* le texte passe sur les coutures */
             }
         }
     }
@@ -1682,13 +1703,20 @@ void decor_render_room(const Room *room, SDL_Renderer *r, Camera cam)
         hr.y = floorf(hr.y - cam.y);
         SDL_RenderTexture(r, rt->hole_tex[i], NULL, &hr);
     }
-    if (room->doors_open) return;
-    for (int d = 0; d < rt->door_count; d++) {
-        if (!rt->door_tex[d]) continue;
+    for (int d = 0; d < rt->door_count && d < room->door_count; d++) {
+        if (!rt->door_tex[d] || !room_door_closed(room, d)) continue;
         SDL_FRect dr = rt->door_rect[d];
         dr.x = floorf(dr.x - cam.x);
         dr.y = floorf(dr.y - cam.y);
         SDL_RenderTexture(r, rt->door_tex[d], NULL, &dr);
+        if (room->doors[d].locked) {
+            /* Porte fermée à clef : la clef qu'il faut, posée sur le bois (GDD §22). */
+            SpriteId key = (SpriteId)(SPR_KEY_SOL + room->doors[d].lock_key);
+            const SDL_FRect *o = &room->doors[d].opening;
+            float kx = floorf(o->x + o->w * 0.5f - cam.x - sprite_width(key) * 0.5f);
+            float ky = floorf(o->y + o->h * 0.5f - cam.y - sprite_height(key) * 0.5f);
+            sprite_draw(r, key, kx, ky, false, false);
+        }
     }
 }
 
